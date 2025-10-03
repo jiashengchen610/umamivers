@@ -1,0 +1,12 @@
+{
+  "name": "umami-builder",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"cd backend && python manage.py runserver\" \"cd frontend && npm run dev\"",
+    "start:backend": "cd backend && python manage.py runserver",
+    "start:frontend": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

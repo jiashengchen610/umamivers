@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide scrollbars while keeping functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Enhanced Paper texture background */
+.paper-texture {
+  background-image: 
+    /* Paper fibers */
+    radial-gradient(ellipse at 20% 20%, rgba(120, 119, 198, 0.02) 0%, transparent 20%),
+    radial-gradient(ellipse at 80% 80%, rgba(120, 119, 198, 0.02) 0%, transparent 20%),
+    radial-gradient(ellipse at 40% 60%, rgba(120, 119, 198, 0.01) 0%, transparent 30%),
+    radial-gradient(ellipse at 70% 30%, rgba(120, 119, 198, 0.01) 0%, transparent 25%),
+    /* Subtle grain */
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(120, 119, 198, 0.003) 2px,
+      rgba(120, 119, 198, 0.003) 4px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 2px,
+      rgba(120, 119, 198, 0.003) 2px,
+      rgba(120, 119, 198, 0.003) 4px
+    ),
+    /* Base subtle variations */
+    radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 90% 10%, rgba(255, 255, 255, 0.6) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(120, 119, 198, 0.03) 0%, transparent 70%);
+  background-color: #fcfcfc;
+}
+
+/* Light paper texture for cards */
+.paper-texture-light {
+  background-image:
+    radial-gradient(ellipse at 30% 30%, rgba(120, 119, 198, 0.01) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 70%, rgba(120, 119, 198, 0.01) 0%, transparent 40%),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 3px,
+      rgba(120, 119, 198, 0.002) 3px,
+      rgba(120, 119, 198, 0.002) 5px
+    );
+  background-color: #ffffff;
+}
+
+/* Subtle paper texture for buttons */
+.paper-texture-btn {
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(120, 119, 198, 0.02) 0%, transparent 60%),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 1px,
+      rgba(120, 119, 198, 0.005) 1px,
+      rgba(120, 119, 198, 0.005) 2px
+    );
+}
+
+/* Flat design - no rounded corners or shadows by default */
+@layer base {
+  * {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  body {
+    @apply paper-texture;
+    font-weight: 200; /* Use light weight for better readability than 100 */
+    color: #1f2937; /* Ensure good contrast against paper background */
+  }
+  
+  /* Typography hierarchy with proper weights for contrast */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 400; /* Medium weight for headings */
+    color: #111827; /* Darker for better contrast */
+  }
+  
+  /* Bold text when needed */
+  strong, .font-semibold, .font-bold {
+    font-weight: 500; /* Medium-bold for better readability */
+  }
+  
+  /* Button text should be readable */
+  button {
+    font-weight: 300;
+  }
+
+  /* Allow charts and specific elements to have minimal styling */
+  .chart-element,
+  .tag-element {
+    border-radius: 2px !important;
+  }
+
+  /* Remove all button shadows and rounds */
+  button {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Circular buttons for icon-only elements */
+  .btn-circular {
+    border-radius: 50% !important;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .btn-circular-sm {
+    border-radius: 50% !important;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

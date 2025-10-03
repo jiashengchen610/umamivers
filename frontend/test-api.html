@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <button id="testBtn">Test API Connection</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/ingredients/');
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h2>Success!</h2>
+                    <p>Found ${data.count} ingredients</p>
+                    <p>First ingredient: ${data.results[0].display_name}</p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h2>Error!</h2>
+                    <p>${error.message}</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
