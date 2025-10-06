@@ -41,7 +41,26 @@ def clean_numeric(value: Any) -> Optional[float]:
     except ValueError:
         return None
 
-def extract_aliases(ingredient_name: str) -> List[tuple]:
+def parse_list(value: Any, lower: bool = False) -> List[str]:
+    """Parse comma/semicolon separated strings into a clean list."""
+    if pd.isna(value) or value is None:
+        return []
+
+    str_val = str(value).strip()
+    if not str_val or str_val.lower() in ['nan', 'na', 'n/a', '-']:
+        return []
+
+    normalised = str_val.replace(';', ',').replace('\n', ',')
+    items: List[str] = []
+    for item in normalised.split(','):
+        cleaned = item.strip()
+        if not cleaned or cleaned.lower() == 'none':
+            continue
+        items.append(cleaned.lower() if lower else cleaned)
+    return items
+
+
+def extract_aliases(ingredient_name: str, variety: Any) -> List[tuple]:
     """Extract aliases including Chinese names and variations"""
     aliases = []
     
@@ -60,6 +79,10 @@ def extract_aliases(ingredient_name: str) -> List[tuple]:
         lang = 'zh' if re.search(r'[\u4e00-\u9fff]', match) else 'en'
         aliases.append((match, lang))
     
+    # Include any explicit variety/origin values
+    for entry in parse_list(variety):
+        aliases.append((entry, 'en'))
+
     return aliases
 
 def process_excel_file(excel_path: str) -> None:
@@ -68,7 +91,7 @@ def process_excel_file(excel_path: str) -> None:
     
     try:
         # Load Excel file
-        df = pd.read_excel(excel_path)
+        df = pd.read_excel(excel_path, sheet_name='Processed_Data')
         print(f"Loaded {len(df)} rows from Excel")
         
         # Display columns for debugging
@@ -83,28 +106,31 @@ def process_excel_file(excel_path: str) -> None:
         for index, row in df.iterrows():
             try:
                 # Extract basic ingredient info
-                ingredient_name = str(row.get('Description', '')).strip()
-                base_name = ingredient_name
+                ingredient_name = str(row.get('Ingredient', '')).strip()
+                base_name = str(row.get('Base_Name', '')).strip() or ingredient_name
                 
                 if not base_name:
                     print(f"Skipping row {index}: no base name")
                     continue
                 
-                # Clean base name (remove parenthetical info for display)
-                display_name = re.sub(r'\s*\([^)]*\)', '', base_name).strip()
+                # Prefer the processed-sheet label for display
+                display_name = ingredient_name or base_name
                 category = str(row.get('Category', '')).strip() or None
-                food_group = str(row.get('Food group', '')).strip() or None
+                cooking_overview = str(row.get('Cooking_Overview', '')).strip() or None
+                extraction_overview = str(row.get('Umami_Extract_Overview', '')).strip() or None
+                if extraction_overview:
+                    cooking_overview = f"{extraction_overview}\n{cooking_overview}" if cooking_overview else extraction_overview
                 
                 # Create ingredient
                 ingredient = Ingredient.objects.create(
                     base_name=base_name,
                     display_name=display_name,
-                    category=category or food_group,
-                    cooking_overview=f"Traditional preparation methods for {food_group.lower()}" if food_group else None
+                    category=category,
+                    cooking_overview=cooking_overview
                 )
-                
+
                 # Create aliases
-                aliases = extract_aliases(ingredient_name)
+                aliases = extract_aliases(ingredient_name, row.get('Variety'))
                 for alias_name, lang in aliases:
                     Alias.objects.create(
                         ingredient=ingredient,
@@ -118,11 +144,18 @@ def process_excel_file(excel_path: str) -> None:
                 imp = clean_numeric(row.get('IMP'))
                 gmp = clean_numeric(row.get('GMP'))
                 amp = clean_numeric(row.get('AMP'))
-                
-                # Calculate derived values
-                umami_aa = (glu or 0) + (asp or 0) if glu or asp else 0
-                umami_nuc = (imp or 0) + (gmp or 0) + (amp or 0) if imp or gmp or amp else 0
-                umami_synergy = umami_aa * umami_nuc / 100 if umami_aa and umami_nuc else 0
+                umami_aa = clean_numeric(row.get('Umami_AA'))
+                umami_nuc = clean_numeric(row.get('Umami_Nuc'))
+                umami_synergy = clean_numeric(row.get('Umami_Synergy'))
+
+                if umami_aa is None:
+                    umami_aa = (glu or 0) + (asp or 0) if (glu or asp) else 0
+                if umami_nuc is None:
+                    umami_nuc = (imp or 0) + (gmp or 0) + (amp or 0) if (imp or gmp or amp) else 0
+                if umami_synergy is None:
+                    weighted_aa = ((glu or 0) * 1.0) + ((asp or 0) * 0.077)
+                    weighted_nuc = ((imp or 0) * 1.0) + ((gmp or 0) * 2.3) + ((amp or 0) * 0.18)
+                    umami_synergy = weighted_aa + (1218 * weighted_aa * weighted_nuc) if (weighted_aa and weighted_nuc) else 0
                 
                 Chemistry.objects.create(
                     ingredient=ingredient,
@@ -136,86 +169,26 @@ def process_excel_file(excel_path: str) -> None:
                     umami_synergy=umami_synergy
                 )
                 
-                # Create TCM data - simplified mapping based on food category
-                qi_mapping = {
-                    'Potatoes and Starches': ['Neutral'],
-                    'Vegetables': ['Cool', 'Neutral'],
-                    'Meat': ['Warm'],
-                    'Seafood': ['Cool'],
-                    'Dairy': ['Cool'],
-                    'Grains': ['Neutral'],
-                    'Fruits': ['Cool'],
-                    'Mushrooms': ['Neutral'],
-                    'Algae': ['Cold'],
-                    'Beverages': ['Neutral'],
-                    'Seasonings and Spices': ['Warm']
-                }
-                
-                flavor_mapping = {
-                    'Potatoes and Starches': ['Sweet'],
-                    'Vegetables': ['Sweet', 'Bitter'],
-                    'Meat': ['Sweet'],
-                    'Seafood': ['Salty'],
-                    'Dairy': ['Sweet'],
-                    'Grains': ['Sweet'],
-                    'Fruits': ['Sweet', 'Sour'],
-                    'Mushrooms': ['Sweet'],
-                    'Algae': ['Salty'],
-                    'Beverages': ['Bitter'],
-                    'Seasonings and Spices': ['Pungent', 'Salty']
-                }
-                
-                meridian_mapping = {
-                    'Potatoes and Starches': ['Spleen', 'Stomach'],
-                    'Vegetables': ['Spleen', 'Liver'],
-                    'Meat': ['Kidney', 'Spleen'],
-                    'Seafood': ['Kidney'],
-                    'Dairy': ['Lung', 'Stomach'],
-                    'Grains': ['Spleen'],
-                    'Fruits': ['Spleen', 'Lung'],
-                    'Mushrooms': ['Spleen', 'Lung'],
-                    'Algae': ['Kidney'],
-                    'Beverages': ['Heart', 'Kidney'],
-                    'Seasonings and Spices': ['Lung', 'Spleen']
-                }
-                
-                # Get appropriate TCM values
-                four_qi = qi_mapping.get(food_group, ['Neutral'])
-                five_flavors = flavor_mapping.get(food_group, ['Sweet'])
-                meridians = meridian_mapping.get(food_group, ['Spleen', 'Stomach'])
-                
+                four_qi = parse_list(row.get('TCM_Four_Qi')) or ['Neutral']
+                five_flavors = parse_list(row.get('TCM_Five_Flavors')) or ['Sweet']
+                meridians = parse_list(row.get('TCM_Meridians')) or ['Spleen', 'Stomach']
+                tcm_overview = str(row.get('TCM_Overview', '')).strip() or None
+                tcm_confidence = clean_numeric(row.get('TCM_Data_Confidence')) or 0.7
+
                 TCM.objects.create(
                     ingredient=ingredient,
                     four_qi=four_qi,
                     five_flavors=five_flavors,
                     meridians=meridians,
-                    overview=f"Traditional Chinese Medicine properties for {food_group.lower()}" if food_group else None,
-                    confidence=0.7  # Simplified mapping has lower confidence
+                    overview=tcm_overview,
+                    confidence=tcm_confidence
                 )
-                
+
                 # Create flags
-                allergens = []  # Would need more sophisticated mapping
-                dietary = []   # Would need more sophisticated mapping
-                
-                # Generate umami tags based on values
-                umami_tags = []
-                if umami_aa > umami_nuc and umami_aa > 10:
-                    umami_tags.append('umami_aa')
-                elif umami_nuc > umami_aa and umami_nuc > 10:
-                    umami_tags.append('umami_nuc')
-                if umami_synergy > 50:
-                    umami_tags.append('high_synergy')
-                    
-                # Generate flavor tags based on food group
-                flavor_tags = []
-                if food_group in ['Meat', 'Seafood', 'Seasonings and Spices']:
-                    flavor_tags.append('flavor_carrier')
-                else:
-                    flavor_tags.append('flavor_supporting')
-                    
-                # Add umami carrier tag for high umami ingredients
-                if umami_synergy > 100 or umami_aa > 50 or umami_nuc > 50:
-                    umami_tags.append('umami_carrier')
+                allergens = parse_list(row.get('Allergen'), lower=True)
+                dietary = parse_list(row.get('Dietary_Restrictions'), lower=True)
+                umami_tags = parse_list(row.get('Umami_Tags'), lower=True)
+                flavor_tags = parse_list(row.get('Flavor_Tags'), lower=True)
                 
                 Flags.objects.create(
                     ingredient=ingredient,

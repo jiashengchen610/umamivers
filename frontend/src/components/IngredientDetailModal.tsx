@@ -7,6 +7,35 @@ import { Ingredient } from '@/types'
 import { getIngredient } from '@/lib/api'
 import { UmamiChart, TCMBars } from './Charts'
 
+const RELIGIOUS_DIETARY_KEYS = new Set(['halal', 'kosher'])
+
+const normaliseKey = (value: string) => value.toLowerCase().replace(/[\s-]+/g, '_')
+
+const formatLabel = (value: string) =>
+  value
+    .replace(/[\s_-]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, char => char.toUpperCase())
+
+const splitDietaryRestrictions = (items: string[] = []) => {
+  const religious: string[] = []
+  const other: string[] = []
+
+  items.forEach(item => {
+    const key = normaliseKey(item)
+    if (RELIGIOUS_DIETARY_KEYS.has(key)) {
+      religious.push(formatLabel(item))
+    } else {
+      other.push(formatLabel(item))
+    }
+  })
+
+  return { religious, other }
+}
+
+const formatAlias = (name: string, language: string) =>
+  language ? `${name} (${formatLabel(language)})` : name
+
 interface IngredientDetailModalProps {
   ingredientId: number | null
   onClose: () => void
@@ -54,23 +83,32 @@ export function IngredientDetailModal({
     if (ingredient && onAddToComposition) {
       onAddToComposition(ingredient)
       onClose()
-      // Navigate back to Home Page
       window.location.href = '/'
     }
   }
 
+  const name = ingredient?.display_name || ingredient?.base_name
+  const summaryText = ingredient?.tcm?.overview || ingredient?.cooking_overview
+  const fallbackSummary = name
+    ? `${name} is a versatile ingredient valued for its culinary applications and balanced umami profile.`
+    : 'This ingredient offers a balanced umami contribution and flexible pairing options.'
+  const allergens = ingredient?.flags?.allergens ?? []
+  const formattedAllergens = allergens.map(formatLabel)
+  const dietarySplit = ingredient ? splitDietaryRestrictions(ingredient.flags?.dietary_restrictions ?? []) : { religious: [], other: [] }
+  const tcmFlavors = ingredient?.tcm?.five_flavors ?? []
+  const tcmQi = ingredient?.tcm?.four_qi ?? []
+  const tcmMeridians = ingredient?.tcm?.meridians ?? []
+  const aliasSummary = ingredient?.aliases?.map(alias => formatAlias(alias.name, alias.language)).join(', ')
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
+    <div className={`fixed inset-0 z-50 overflow-y-auto ${className}`}>
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black/40 transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative paper-texture-light max-w-5xl w-full max-h-[95vh] overflow-hidden border border-gray-300">
-          {/* Close button - flat design */}
+      <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
+        <div className="relative paper-texture-light w-full max-w-5xl max-h-[95vh] overflow-hidden border border-gray-300">
           <button
             onClick={onClose}
             className="btn-circular absolute top-4 right-4 z-10 bg-gray-100 hover:bg-gray-200 transition-all border border-gray-300"
@@ -78,11 +116,10 @@ export function IngredientDetailModal({
             <X className="w-5 h-5 text-gray-600" />
           </button>
 
-          {/* Content - Scrollable */}
           <div className="max-h-[95vh] overflow-y-auto scrollbar-hide">
             {loading && (
               <div className="text-center py-20">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-500"></div>
                 <p className="mt-4 text-gray-600 text-lg">Loading ingredient details...</p>
               </div>
             )}
@@ -95,301 +132,174 @@ export function IngredientDetailModal({
 
             {ingredient && !loading && (
               <>
-                {/* Hero Section */}
-                <div className="relative bg-blue-50 border-b border-blue-200 px-8 pt-12 pb-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    {/* Main Info */}
-                    <div className="lg:col-span-2">
-                      <div className="mb-4">
+                <section className="px-4 sm:px-8 pt-12 pb-8 bg-white border-b border-gray-200">
+                  <div className="grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,2fr)_1fr] items-start">
+                    <div className="space-y-6">
+                      <div className="space-y-3">
                         {ingredient.category && (
-                          <span className="tag-element inline-block px-3 py-1 bg-blue-100 text-blue-700 text-sm uppercase tracking-wide font-medium mb-3">
-                            {ingredient.category}
-                          </span>
+                          <span className="text-xs uppercase tracking-wide text-gray-500">{ingredient.category}</span>
                         )}
-                        <h1 className="text-3xl font-bold text-gray-900 mb-3">
-                          {ingredient.display_name || ingredient.base_name}
-                        </h1>
-                        <p className="text-gray-600 text-lg leading-relaxed">
-                          {ingredient.tcm?.overview || 
-                           `${ingredient.display_name || ingredient.base_name} is a versatile ingredient prized for its unique flavor profile and nutritional benefits.`}
+                        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">{name}</h1>
+                        <p className="text-sm leading-relaxed text-gray-600">
+                          {summaryText || fallbackSummary}
                         </p>
                       </div>
-                      
-                      {/* Tags */}
-                      <div className="space-y-3">
-                        {/* Dietary restrictions */}
-                        {ingredient.flags?.dietary_restrictions && ingredient.flags.dietary_restrictions.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {ingredient.flags.dietary_restrictions.map((restriction, idx) => (
-                              <span key={idx} className="tag-element px-3 py-1 bg-green-100 text-green-700 text-sm font-medium">
-                                {restriction}
-                              </span>
-                            ))}
+
+                      <div className="grid gap-4 sm:grid-cols-2 text-sm text-gray-700">
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium uppercase text-gray-500">Allergens</div>
+                          <p className="leading-relaxed">
+                            {formattedAllergens.length ? formattedAllergens.join(', ') : 'None reported'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium uppercase text-gray-500">Religious suitability</div>
+                          <p className="leading-relaxed">
+                            {dietarySplit.religious.length ? dietarySplit.religious.join(', ') : 'Not specified'}
+                          </p>
+                        </div>
+                        {(tcmFlavors.length > 0 || tcmQi.length > 0) && (
+                          <div className="space-y-1">
+                            <div className="text-xs font-medium uppercase text-gray-500">TCM focus</div>
+                            <p className="leading-relaxed">
+                              {[tcmFlavors.slice(0, 3).join(', '), tcmQi.join(', ')].filter(Boolean).join(' • ') || 'Balanced profile'}
+                            </p>
                           </div>
                         )}
-                        
-                        {/* Allergens */}
-                        {ingredient.flags?.allergens && ingredient.flags.allergens.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {ingredient.flags.allergens.map((allergen, idx) => (
-                              <span key={idx} className="tag-element px-3 py-1 bg-red-100 text-red-700 text-sm font-medium">
-                                Contains {allergen}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* TCM Properties */}
-                        {ingredient.tcm && (ingredient.tcm.five_flavors.length > 0 || ingredient.tcm.four_qi.length > 0) && (
-                          <div className="flex flex-wrap gap-2">
-                            {ingredient.tcm.five_flavors.slice(0, 3).map((flavor, idx) => (
-                              <span key={idx} className="tag-element px-3 py-1 bg-green-50 text-green-700 text-sm border border-green-200">
-                                {flavor}
-                              </span>
-                            ))}
-                            {ingredient.tcm.four_qi.slice(0, 2).map((qi, idx) => (
-                              <span key={idx} className="tag-element px-3 py-1 bg-blue-50 text-blue-700 text-sm border border-blue-200">
-                                {qi}
-                              </span>
-                            ))}
+                        {dietarySplit.other.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="text-xs font-medium uppercase text-gray-500">Additional dietary</div>
+                            <p className="leading-relaxed">
+                              {dietarySplit.other.slice(0, 3).join(', ')}
+                              {dietarySplit.other.length > 3 ? ` +${dietarySplit.other.length - 3}` : ''}
+                            </p>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Action Card */}
-                    <div className="paper-texture-light p-6 border border-gray-200">
-                      <div className="text-center mb-4">
-                        <h3 className="font-semibold text-gray-900 mb-2">Add to Composition</h3>
-                        <p className="text-sm text-gray-600">Build your umami blend</p>
+                    <div className="space-y-4 rounded border border-gray-200 bg-white p-4 sm:p-6">
+                      <div>
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Composition</h2>
+                        <p className="mt-2 text-sm text-gray-600">
+                          Add {name} directly to your composition workspace.
+                        </p>
                       </div>
                       {onAddToComposition && (
                         <button
                           onClick={handleAddToComposition}
-                          className="paper-texture-btn w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+                          className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white text-sm font-medium py-2 hover:bg-gray-800 transition-colors"
                         >
-                          <Plus className="w-5 h-5" />
-                          Add Ingredient
+                          <Plus className="w-4 h-4" />
+                          <span>+ Add to combo</span>
                         </button>
                       )}
+                      <div className="pt-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">
+                        <div>Base name: {ingredient.base_name}</div>
+                        {aliasSummary && <div>Aliases: {aliasSummary}</div>}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Data Section */}
-                <div className="px-8 py-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Umami Profile */}
+                <section className="px-4 sm:px-8 py-8 bg-white space-y-8">
+                  <div className="grid gap-6 lg:grid-cols-2">
                     {ingredient.chemistry && (
-                      <div className="bg-orange-50 border border-orange-200 p-6">
-                        <div className="mb-6">
-                          <h3 className="text-xl font-bold text-gray-900 mb-2">Umami Profile</h3>
-                          <p className="text-sm text-orange-600 font-medium">AA + Nuc = 8x Synergy</p>
-                        </div>
-                        <div className="space-y-4">
-                          {/* AA */}
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium text-gray-700">Amino Acids (Glu, Asp)</span>
-                              <span className="text-lg font-bold text-orange-600">{parseFloat(ingredient.chemistry.umami_aa || '0').toFixed(1)}</span>
-                            </div>
-                            <div className="chart-element h-3 bg-gray-200 overflow-hidden">
-                              <div
-                                className="h-full bg-orange-500 transition-all duration-500"
-                                style={{ width: `${Math.min(100, (parseFloat(ingredient.chemistry.umami_aa || '0') / 2000) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          
-                          {/* Nuc */}
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium text-gray-700">Nucleotides (IMP, GMP, AMP)</span>
-                              <span className="text-lg font-bold text-yellow-600">{parseFloat(ingredient.chemistry.umami_nuc || '0').toFixed(1)}</span>
-                            </div>
-                            <div className="chart-element h-3 bg-gray-200 overflow-hidden">
-                              <div
-                                className="h-full bg-yellow-500 transition-all duration-500"
-                                style={{ width: `${Math.min(100, (parseFloat(ingredient.chemistry.umami_nuc || '0') / 500) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          
-                          {/* Synergy */}
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium text-gray-700">Synergy Potential</span>
-                              <span className="text-lg font-bold text-purple-600">{parseFloat(ingredient.chemistry.umami_synergy || '0').toFixed(1)}</span>
-                            </div>
-                            <div className="chart-element h-3 bg-gray-200 overflow-hidden">
-                              <div
-                                className="h-full bg-purple-500 transition-all duration-500"
-                                style={{ width: `${Math.min(100, (parseFloat(ingredient.chemistry.umami_synergy || '0') / 3000) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
+                      <div className="paper-texture-light border border-gray-200 p-4 sm:p-6">
+                        <UmamiChart chemistry={ingredient.chemistry} />
                       </div>
                     )}
-
-                    {/* TCM Properties */}
-                    {ingredient.tcm && (ingredient.tcm.four_qi.length > 0 || ingredient.tcm.five_flavors.length > 0) && (
-                      <div className="bg-green-50 border border-green-200 p-6">
-                        <div className="mb-6">
-                          <h3 className="text-xl font-bold text-gray-900 mb-2">TCM Properties</h3>
-                          <p className="text-sm text-green-600 font-medium">Traditional Medicine Profile</p>
-                        </div>
-                        
-                        <div className="space-y-6">
-                          {/* Four Natures */}
-                          {ingredient.tcm.four_qi.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-3">Four Natures (四氣)</h4>
-                              <div className="flex gap-2">
-                                {['Cold', 'Cool', 'Neutral', 'Warm', 'Hot'].map((qi) => {
-                                  const isActive = ingredient.tcm!.four_qi.includes(qi)
-                                  const colors = {
-                                    'Cold': 'bg-blue-400',
-                                    'Cool': 'bg-blue-300', 
-                                    'Neutral': 'bg-gray-300',
-                                    'Warm': 'bg-orange-300',
-                                    'Hot': 'bg-red-400'
-                                  }
-                                  return (
-                                    <div key={qi} className="flex-1 text-center">
-                                      <div className={`chart-element h-8 ${isActive ? colors[qi as keyof typeof colors] : 'bg-gray-100'} transition-all duration-300`} />
-                                      <span className={`text-xs mt-1 block ${isActive ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-                                        {qi}
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Five Tastes */}
-                          {ingredient.tcm.five_flavors.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-3">TCM Five Tastes (五味)</h4>
-                              <div className="flex gap-2">
-                                {['Bitter', 'Sour', 'Salty', 'Sweet', 'Spicy'].map((flavor) => {
-                                  const isActive = ingredient.tcm!.five_flavors.includes(flavor) || 
-                                                  (flavor === 'Spicy' && ingredient.tcm!.five_flavors.includes('Pungent'))
-                                  const colors = {
-                                    'Bitter': 'bg-green-300',
-                                    'Sour': 'bg-yellow-300',
-                                    'Salty': 'bg-gray-400',
-                                    'Sweet': 'bg-pink-300',
-                                    'Spicy': 'bg-red-300'
-                                  }
-                                  return (
-                                    <div key={flavor} className="flex-1 text-center">
-                                      <div className={`chart-element h-8 ${isActive ? colors[flavor as keyof typeof colors] : 'bg-gray-100'} transition-all duration-300`} />
-                                      <span className={`text-xs mt-1 block ${isActive ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-                                        {flavor}
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Meridians */}
-                          {ingredient.tcm.meridians.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-3">Meridian Tropism (歸經)</h4>
-                              <div className="flex flex-wrap gap-2">
-                                {ingredient.tcm.meridians.map((meridian, idx) => (
-                                  <span key={idx} className="tag-element px-3 py-1 bg-purple-100 text-purple-700 text-sm font-medium">
-                                    {meridian}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                    {ingredient.tcm && (
+                      <div className="paper-texture-light border border-gray-200 p-4 sm:p-6">
+                        <TCMBars tcm={ingredient.tcm} />
                       </div>
                     )}
                   </div>
-                  
-                  {/* Bottom Section - Usage Tips */}
-                  <div className="mt-8 bg-gray-50 border border-gray-200 p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                  <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Dietary Details</h3>
+                    <div className="grid gap-4 sm:grid-cols-2 text-sm text-gray-700">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                          Culinary Applications
-                        </h3>
-                        <p className="text-gray-600 text-sm leading-relaxed">
-                          {ingredient.cooking_overview || 
-                          `Perfect for enhancing umami depth in broths, marinades, and seasonings. 
-                          Pairs exceptionally well with other high-nucleotide ingredients for maximum synergy effect.`}
+                        <div className="text-xs font-medium uppercase text-gray-500">Religious suitability</div>
+                        <p className="mt-1 leading-relaxed">
+                          {dietarySplit.religious.length ? dietarySplit.religious.join(', ') : 'No specific religious tags recorded.'}
                         </p>
                       </div>
-                      
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                          Preparation Notes
-                        </h3>
-                        <div className="space-y-2 text-sm text-gray-600">
-                          {ingredient.extraction_temp && (
-                            <p><span className="font-medium">Optimal Temperature:</span> {ingredient.extraction_temp}°C</p>
-                          )}
-                          {ingredient.extraction_time && (
-                            <p><span className="font-medium">Extraction Time:</span> {ingredient.extraction_time} minutes</p>
-                          )}
-                          {(!ingredient.extraction_temp && !ingredient.extraction_time) && (
-                            <p>Gentle heating recommended to preserve umami compounds. Avoid prolonged high-temperature cooking.</p>
-                          )}
-                        </div>
+                        <div className="text-xs font-medium uppercase text-gray-500">Other dietary notes</div>
+                        <p className="mt-1 leading-relaxed">
+                          {dietarySplit.other.length ? dietarySplit.other.join(', ') : 'No additional dietary restrictions recorded.'}
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Description section - Now inside scrollable area */}
-                  <div className="mt-8 px-8 grid lg:grid-cols-2 gap-8">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-4">Description</h3>
-                      <p className="text-gray-600 leading-relaxed">
-                        {ingredient.tcm?.overview || 
-                         `${ingredient.display_name || ingredient.base_name} are edible mushrooms native to East Asia, prized for their rich, savory taste and diverse health benefits. They are one of the most popular mushrooms worldwide.`}
+                  {(tcmMeridians.length > 0 || ingredient.similar?.length || ingredient.complementary?.length) && (
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      {tcmMeridians.length > 0 && (
+                        <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-3">
+                          <h3 className="text-lg font-semibold text-gray-900">Meridian Guidance</h3>
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {name} interacts with the following meridians:
+                          </p>
+                          <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                            {tcmMeridians.map(item => (
+                              <li key={item}>{formatLabel(item)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {(ingredient.similar?.length || ingredient.complementary?.length) && (
+                        <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-3">
+                          <h3 className="text-lg font-semibold text-gray-900">Pairing Notes</h3>
+                          {ingredient.complementary?.length ? (
+                            <div className="text-sm text-gray-700">
+                              <div className="text-xs font-medium uppercase text-gray-500 mb-1">Synergistic partners</div>
+                              <ul className="space-y-1 list-disc list-inside text-gray-600">
+                                {ingredient.complementary.slice(0, 4).map(item => (
+                                  <li key={item.id}>{item.display_name || item.base_name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {ingredient.similar?.length ? (
+                            <div className="text-sm text-gray-700">
+                              <div className="text-xs font-medium uppercase text-gray-500 mb-1">Similar profile</div>
+                              <ul className="space-y-1 list-disc list-inside text-gray-600">
+                                {ingredient.similar.slice(0, 4).map(item => (
+                                  <li key={item.id}>{item.display_name || item.base_name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-3">
+                      <h3 className="text-lg font-semibold text-gray-900">Overview</h3>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {summaryText || fallbackSummary}
                       </p>
                     </div>
-
-                    <div>
-                      <div className="paper-texture-light bg-gray-50 border border-gray-200 p-6">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-4">Find Combinations</h3>
-                        <p className="text-gray-600 mb-4">
-                          Discover ingredients that create umami synergy with {ingredient.display_name || ingredient.base_name}.
-                        </p>
-                        <button className="paper-texture-btn w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 transition-colors flex items-center justify-center gap-2">
-                          Explore Pairings →
-                        </button>
-                      </div>
+                    <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-3">
+                      <h3 className="text-lg font-semibold text-gray-900">Preparation</h3>
+                      <ul className="text-sm text-gray-700 space-y-2">
+                        {ingredient.extraction_temp && (
+                          <li><span className="font-medium text-gray-900">Extraction temperature:</span> {ingredient.extraction_temp}°C</li>
+                        )}
+                        {ingredient.extraction_time && (
+                          <li><span className="font-medium text-gray-900">Extraction time:</span> {ingredient.extraction_time} minutes</li>
+                        )}
+                        {(!ingredient.extraction_temp && !ingredient.extraction_time) && (
+                          <li>Gentle heating preserves umami compounds; avoid prolonged high-temperature cooking.</li>
+                        )}
+                      </ul>
                     </div>
                   </div>
-
-                  {/* Preparation section - Now inside scrollable area */}
-                  <div className="mt-8 px-8 pb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Preparation</h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <span className="font-semibold text-gray-900">Methods:</span>
-                        <span className="ml-2 text-gray-600">
-                          Soak in water to extract umami. Use fresh or dried.
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-900">Extraction:</span>
-                        <span className="ml-2 text-gray-600">
-                          Gentle simmering enhances flavor. Avoid boiling.
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                </section>
               </>
             )}
           </div>
@@ -399,7 +309,6 @@ export function IngredientDetailModal({
   )
 }
 
-// Hook for URL-based modal management
 export function useIngredientModal() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -420,6 +329,6 @@ export function useIngredientModal() {
   return {
     ingredientId: ingredientId ? parseInt(ingredientId, 10) : null,
     openModal,
-    closeModal
+    closeModal,
   }
 }

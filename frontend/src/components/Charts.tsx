@@ -55,14 +55,18 @@ export function CategoricalBar({ title, data, onAddClick, className = '' }: Cate
 
 interface TCMBarsProps {
   tcm: TCM
+  distributions?: {
+    four_qi?: Record<string, number>
+    five_flavors?: Record<string, number>
+    meridians?: Record<string, number>
+  }
   onQiAddClick?: () => void
   onFlavorAddClick?: () => void
   onMeridianAddClick?: () => void
   className?: string
 }
 
-export function TCMBars({ tcm, onQiAddClick, onFlavorAddClick, onMeridianAddClick, className = '' }: TCMBarsProps) {
-  // Color mapping for TCM attributes
+export function TCMBars({ tcm, distributions, onQiAddClick, onFlavorAddClick, onMeridianAddClick, className = '' }: TCMBarsProps) {
   const qiColors: Record<string, string> = {
     'Cold': '#6FB7E8',
     'Cool': '#9BB9E8', 
@@ -73,128 +77,152 @@ export function TCMBars({ tcm, onQiAddClick, onFlavorAddClick, onMeridianAddClic
     'Slightly Cold': '#9BB9E8',
     'Variable': '#D1D1D1'
   }
-  
+
   const flavorColors: Record<string, string> = {
     'Bitter': '#C8E6C9',
     'Sour': '#FFF9C4', 
     'Salty': '#E1E1E1',
     'Sweet': '#F8BBD9',
-    'Spicy': '#FFAB91',
     'Pungent': '#FFAB91',
-    'Astringent': '#E8E8E8',
     'Bland': '#F5F5F5'
   }
-  
-  // Create data for bars with proper value calculation
-  const qiData = tcm.four_qi.map(qi => ({
-    name: qi,
-    value: Math.round(100 / tcm.four_qi.length), // Equal distribution based on actual count
-    color: qiColors[qi] || '#D1D1D1'
-  }))
-  
-  const flavorData = tcm.five_flavors.map(flavor => ({
-    name: flavor, 
-    value: Math.round(100 / tcm.five_flavors.length), // Equal distribution based on actual count
-    color: flavorColors[flavor] || '#F5F5F5'
-  }))
-  
-  // Meridians display (different format)
-  const meridianText = tcm.meridians.length > 0 
-    ? tcm.meridians.map((meridian, index) => {
-        const percentage = Math.floor(100 / tcm.meridians.length)
-        return `${meridian} ${percentage}%`
-      }).join(' , ')
+
+  const normaliseFlavor = (label: string) => {
+    if (label.toLowerCase() === 'spicy') return 'Pungent'
+    return label
+  }
+
+  const buildSegments = (
+    values: string[],
+    colors: Record<string, string>,
+    distribution?: Record<string, number>,
+    normalise?: (label: string) => string
+  ) => {
+    const entries = distribution && Object.keys(distribution).length > 0
+      ? Object.entries(distribution)
+      : Array.from(new Set(values)).map(label => [label, 1])
+
+    if (entries.length === 0) {
+      return []
+    }
+
+    const total = entries.reduce((sum, [, value]) => sum + value, 0) || 1
+    const sorted = entries
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+
+    let remainder = 100
+    const segments = sorted.map((entry, index) => {
+      const rawPercent = (entry.value / total) * 100
+      const rounded = index === sorted.length - 1
+        ? Math.max(0, remainder)
+        : Math.round(rawPercent * 10) / 10
+      remainder = Math.max(0, remainder - rounded)
+      const displayLabel = normalise ? normalise(entry.label) : entry.label
+      return {
+        name: displayLabel,
+        originalName: entry.label,
+        value: rounded,
+        color: colors[displayLabel] || '#D1D1D1'
+      }
+    }).filter(segment => segment.value > 0)
+
+    const correction = 100 - segments.reduce((sum, segment) => sum + segment.value, 0)
+    if (segments.length > 0 && Math.abs(correction) >= 0.1) {
+      segments[segments.length - 1].value = Math.max(0, segments[segments.length - 1].value + correction)
+    }
+
+    return segments
+  }
+
+  const qiSegments = buildSegments(tcm.four_qi, qiColors, distributions?.four_qi)
+  const flavorSegments = buildSegments(tcm.five_flavors, flavorColors, distributions?.five_flavors, normaliseFlavor)
+
+  const meridianEntries = (() => {
+    if (distributions?.meridians && Object.keys(distributions.meridians).length > 0) {
+      const total = Object.values(distributions.meridians).reduce((sum, value) => sum + value, 0) || 1
+      return Object.entries(distributions.meridians)
+        .filter(([, value]) => value > 0)
+        .map(([label, value]) => ({ label, value: Math.round((value / total) * 100) }))
+        .sort((a, b) => b.value - a.value)
+    }
+    if (tcm.meridians.length === 0) return []
+    const equalShare = 100 / tcm.meridians.length
+    return Array.from(new Set(tcm.meridians)).map(label => ({ label, value: Math.round(equalShare) }))
+  })()
+
+  const renderStackedBar = (
+    title: string,
+    description: string,
+    segments: Array<{ name: string, value: number, color: string }>,
+    onAdd?: () => void
+  ) => (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h3 className="text-sm font-medium text-gray-700">{title}</h3>
+          <p className="text-xs text-gray-500">{description}</p>
+        </div>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            <Plus className="w-4 h-4 text-gray-600" />
+          </button>
+        )}
+      </div>
+      <div className="h-5 bg-gray-100 rounded overflow-hidden flex">
+        {segments.map(segment => (
+          <div
+            key={segment.name}
+            className="h-full"
+            style={{
+              width: `${segment.value}%`,
+              backgroundColor: segment.color
+            }}
+            title={`${segment.name} ${segment.value.toFixed(0)}%`}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2 text-xs text-gray-600">
+        {segments.map(segment => (
+          <span key={segment.name} className="flex items-center gap-1">
+            <span
+              className="inline-block w-2 h-2 rounded-full"
+              style={{ backgroundColor: segment.color }}
+            />
+            {segment.name} {segment.value.toFixed(0)}%
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+
+  const meridianText = meridianEntries.length > 0
+    ? meridianEntries.map(entry => `${entry.label} ${entry.value}%`).join(' · ')
     : 'Not specified'
-  
+
   return (
     <div className={`space-y-4 ${className}`}>
-      {qiData.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h3 className="text-sm font-medium text-gray-700">Four Natures (四氣)</h3>
-              <p className="text-xs text-gray-500">Thermal energy effects: Cold ❄️ Cool 🌊 Neutral ⚖️ Warm ☀️ Hot 🔥</p>
-            </div>
-            {onQiAddClick && (
-              <button
-                onClick={onQiAddClick}
-                className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                <Plus className="w-4 h-4 text-gray-600" />
-              </button>
-            )}
-          </div>
-          <div className="space-y-1">
-            {qiData.map((item, index) => {
-              const percentage = Math.max(...qiData.map(d => d.value)) > 0 ? Math.round((item.value / Math.max(...qiData.map(d => d.value))) * 100) : 0
-              return (
-                <div key={index} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 min-w-[60px] truncate" title={item.name}>
-                    {item.name}
-                  </span>
-                  <span className="text-xs text-gray-500 min-w-[35px]">{percentage}%</span>
-                  <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-                    <div
-                      className="h-full transition-all duration-300"
-                      style={{ 
-                        width: `${percentage}%`,
-                        backgroundColor: item.color || '#D1D1D1'
-                      }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      {qiSegments.length > 0 && renderStackedBar(
+        'Four Natures',
+        'Thermal energy balance across ingredients',
+        qiSegments,
+        onQiAddClick
       )}
-      
-      {flavorData.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h3 className="text-sm font-medium text-gray-700">TCM Five Tastes (五味)</h3>
-              <p className="text-xs text-gray-500">Organ connection: Bitter→Heart Sour→Liver Sweet→Spleen Spicy→Lungs Salty→Kidneys</p>
-            </div>
-            {onFlavorAddClick && (
-              <button
-                onClick={onFlavorAddClick}
-                className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                <Plus className="w-4 h-4 text-gray-600" />
-              </button>
-            )}
-          </div>
-          <div className="space-y-1">
-            {flavorData.map((item, index) => {
-              const maxFlavorValue = Math.max(...flavorData.map(d => d.value), 1)
-              const percentage = maxFlavorValue > 0 ? Math.round((item.value / maxFlavorValue) * 100) : 0
-              return (
-                <div key={index} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 min-w-[60px] truncate" title={item.name}>
-                    {item.name}
-                  </span>
-                  <span className="text-xs text-gray-500 min-w-[35px]">{percentage}%</span>
-                  <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-                    <div
-                      className="h-full transition-all duration-300"
-                      style={{ 
-                        width: `${percentage}%`,
-                        backgroundColor: item.color || '#D1D1D1'
-                      }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+
+      {flavorSegments.length > 0 && renderStackedBar(
+        'Five Tastes',
+        'Flavor-energy interaction for organ targeting',
+        flavorSegments,
+        onFlavorAddClick
       )}
-      
+
       <div className="space-y-2">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-sm font-medium text-gray-700">Meridian Tropism (歸經)</h3>
+            <h3 className="text-sm font-medium text-gray-700">Meridian Tropism</h3>
             <p className="text-xs text-gray-500">Energy pathways to specific organ systems</p>
           </div>
           {onMeridianAddClick && (
@@ -225,6 +253,14 @@ export function UmamiChart({ chemistry, onAddClick, className = '', showIndividu
   const nucValue = parseFloat(chemistry.umami_nuc?.toString() || '0')
   const synergyValue = parseFloat(chemistry.umami_synergy?.toString() || '0')
   const maxValue = Math.max(aaValue, nucValue, synergyValue, 1)
+
+  const isEnhanced = (() => {
+    if (nucValue <= 0) return false
+    const ratio = aaValue / nucValue
+    return ratio >= 0.7 && ratio <= 1.5
+  })()
+
+  const synergyLabel = isEnhanced ? 'Enhanced' : 'Baseline'
   
   return (
     <div className={`space-y-3 ${className}`}>
@@ -243,64 +279,47 @@ export function UmamiChart({ chemistry, onAddClick, className = '', showIndividu
         )}
       </div>
       
-      <div className="space-y-2">
-        {/* Amino Acids */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 min-w-[80px]">
-            {showIndividual ? 'Amino Acids' : 'AA'}
-          </span>
-          <span className="text-xs text-gray-500 min-w-[35px]">{aaValue.toFixed(1)}</span>
-          <div className="flex-1 h-6 bg-gray-200 rounded overflow-hidden">
-            <div
-              className="h-full bg-orange-500 transition-all duration-300 flex items-center px-2"
-              style={{ width: `${maxValue > 0 ? (aaValue / maxValue) * 100 : 0}%` }}
-            >
-              {aaValue > 0 && (
-                <span className="text-xs font-medium text-white whitespace-nowrap">
-                  {showIndividual ? 'Glu, Asp' : ''}
-                </span>
-              )}
+      <div className="space-y-1.5">
+        {[{
+          label: showIndividual ? 'Amino Acids' : 'AA',
+          value: aaValue,
+          color: 'bg-orange-500',
+          text: showIndividual ? 'Glu, Asp' : '',
+          emphasis: false
+        }, {
+          label: showIndividual ? 'Nucleotides' : 'Nuc',
+          value: nucValue,
+          color: 'bg-yellow-600',
+          text: showIndividual ? 'IMP, GMP, AMP' : '',
+          emphasis: false
+        }, {
+          label: 'Synergy',
+          value: synergyValue,
+          color: 'bg-purple-400',
+          text: synergyLabel,
+          emphasis: true
+        }].map(row => (
+          <div key={row.label} className="grid grid-cols-[90px_48px_minmax(0,1fr)] items-center gap-2">
+            <span className="text-xs text-gray-600">{row.label}</span>
+            <span className="text-xs text-gray-500 text-right">{row.value.toFixed(1)}</span>
+            <div className="h-6 bg-gray-200 rounded overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 px-2 flex items-center ${row.color}`}
+                style={{ width: `${maxValue > 0 ? (row.value / maxValue) * 100 : 0}%` }}
+              >
+                {row.value > 0 && row.text && (
+                  <span
+                    className={`text-xs font-medium whitespace-nowrap ${
+                      row.emphasis ? (isEnhanced ? 'text-gray-700' : 'text-purple-900/70') : 'text-white'
+                    }`}
+                  >
+                    {row.text}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        
-        {/* Nucleotides */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 min-w-[80px]">
-            {showIndividual ? 'Nucleotides' : 'Nuc'}
-          </span>
-          <span className="text-xs text-gray-500 min-w-[35px]">{nucValue.toFixed(1)}</span>
-          <div className="flex-1 h-6 bg-gray-200 rounded overflow-hidden">
-            <div
-              className="h-full bg-yellow-600 transition-all duration-300 flex items-center px-2"
-              style={{ width: `${maxValue > 0 ? (nucValue / maxValue) * 100 : 0}%` }}
-            >
-              {nucValue > 0 && (
-                <span className="text-xs font-medium text-white whitespace-nowrap">
-                  {showIndividual ? 'IMP, GMP, AMP' : ''}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Synergy */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 min-w-[80px]">Synergy</span>
-          <span className="text-xs text-gray-500 min-w-[35px]">{synergyValue.toFixed(1)}</span>
-          <div className="flex-1 h-6 bg-gray-200 rounded overflow-hidden">
-            <div
-              className="h-full bg-purple-400 transition-all duration-300 flex items-center px-2"
-              style={{ width: `${maxValue > 0 ? (synergyValue / maxValue) * 100 : 0}%` }}
-            >
-              {synergyValue > 0 && (
-                <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
-                  Enhanced
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   )
@@ -312,49 +331,27 @@ interface MiniBarsProps {
 }
 
 export function MiniBars({ chemistry, className = '' }: MiniBarsProps) {
-  const maxValue = Math.max(chemistry.umami_aa, chemistry.umami_nuc, chemistry.umami_synergy)
-  
+  const maxValue = Math.max(chemistry.umami_aa, chemistry.umami_nuc, chemistry.umami_synergy, 1)
+
+  const rows = [
+    { label: 'AA', value: chemistry.umami_aa, color: 'bg-umami-aa' },
+    { label: 'Nuc', value: chemistry.umami_nuc, color: 'bg-umami-nuc' },
+    { label: 'Syn', value: chemistry.umami_synergy, color: 'bg-umami-synergy' }
+  ]
+
   return (
-    <div className={`flex gap-1 ${className}`}>
-      {/* Umami AA bar */}
-      <div className="flex-1 space-y-1">
-        <div className="h-2 bg-gray-200 rounded overflow-hidden">
-          <div
-            className="h-full bg-umami-aa transition-all duration-300"
-            style={{ 
-              width: maxValue > 0 ? `${(chemistry.umami_aa / maxValue) * 100}%` : '0%' 
-            }}
-          />
+    <div className={`space-y-1 ${className}`}>
+      {rows.map(row => (
+        <div key={row.label} className="grid grid-cols-[32px_minmax(0,1fr)] items-center gap-1 text-xs text-gray-500">
+          <span className="text-right">{row.label}</span>
+          <div className="h-2 bg-gray-200 rounded overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 ${row.color}`}
+              style={{ width: `${(row.value / maxValue) * 100}%` }}
+            />
+          </div>
         </div>
-        <div className="text-xs text-gray-500 text-center">AA</div>
-      </div>
-      
-      {/* Umami Nuc bar */}
-      <div className="flex-1 space-y-1">
-        <div className="h-2 bg-gray-200 rounded overflow-hidden">
-          <div
-            className="h-full bg-umami-nuc transition-all duration-300"
-            style={{ 
-              width: maxValue > 0 ? `${(chemistry.umami_nuc / maxValue) * 100}%` : '0%' 
-            }}
-          />
-        </div>
-        <div className="text-xs text-gray-500 text-center">Nuc</div>
-      </div>
-      
-      
-      {/* Synergy bar */}
-      <div className="flex-1 space-y-1">
-        <div className="h-2 bg-gray-200 rounded overflow-hidden">
-          <div
-            className="h-full bg-umami-synergy transition-all duration-300"
-            style={{ 
-              width: maxValue > 0 ? `${(chemistry.umami_synergy / maxValue) * 100}%` : '0%' 
-            }}
-          />
-        </div>
-        <div className="text-xs text-gray-500 text-center">Syn</div>
-      </div>
+      ))}
     </div>
   )
 }

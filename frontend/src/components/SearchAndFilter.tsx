@@ -1,9 +1,18 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Search, X, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { Search, X, ChevronDown, SlidersHorizontal, ArrowUpDown } from 'lucide-react'
 import { FilterState } from '@/types'
 import { debounce } from '@/lib/api'
+
+const SORT_OPTIONS = [
+  { value: 'relevance', label: 'Relevance' },
+  { value: 'synergy', label: 'Synergy' },
+  { value: 'aa', label: 'Amino Acids' },
+  { value: 'nuc', label: 'Nucleotides' },
+  { value: 'tcm', label: 'TCM' },
+  { value: 'alpha', label: 'A→Z' }
+]
 
 interface SearchBarProps {
   value: string
@@ -163,11 +172,22 @@ interface FilterRowProps {
   resultCount: number
   compact?: boolean
   className?: string
+  onClearFilters?: () => void
+  showResultCount?: boolean
 }
 
-export function FilterRow({ filters, onChange, resultCount, compact = false, className = '' }: FilterRowProps) {
+export function FilterRow({ filters, onChange, resultCount, compact = false, className = '', onClearFilters, showResultCount = true }: FilterRowProps) {
   // Filter options - these would normally come from the API or constants
-  const umamiOptions = [
+const SORT_OPTIONS = [
+  { value: 'relevance', label: 'Relevance' },
+  { value: 'synergy', label: 'Synergy' },
+  { value: 'aa', label: 'Amino Acids' },
+  { value: 'nuc', label: 'Nucleotides' },
+  { value: 'tcm', label: 'TCM' },
+  { value: 'alpha', label: 'A→Z' }
+]
+
+const umamiOptions = [
     { value: 'umami_aa', label: 'Umami AA' },
     { value: 'umami_nuc', label: 'Umami Nuc' },
     { value: 'umami_synergy', label: 'Umami Synergy' }
@@ -239,13 +259,7 @@ export function FilterRow({ filters, onChange, resultCount, compact = false, cla
     { value: 'keto', label: 'Keto' }
   ]
 
-  const sortOptions = [
-    { value: 'relevance', label: 'Relevance' },
-    { value: 'synergy', label: 'Synergy' },
-    { value: 'aa', label: 'Amino Acids' },
-    { value: 'nuc', label: 'Nucleotides' },
-    { value: 'alpha', label: 'A→Z' }
-  ]
+  const sortOptions = SORT_OPTIONS
 
   // Get all active filter chips
   const getActiveChips = () => {
@@ -364,38 +378,115 @@ export function FilterRow({ filters, onChange, resultCount, compact = false, cla
           selectedValues={filters.dietary}
           onChange={(values) => onChange({ ...filters, dietary: values })}
         />
-        
-        {/* Sort dropdown */}
-        <select
-          value={filters.sort}
-          onChange={(e) => onChange({ ...filters, sort: e.target.value as FilterState['sort'] })}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm whitespace-nowrap flex-shrink-0"
-        >
-          {sortOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              Sort: {option.label}
-            </option>
-          ))}
-        </select>
       </div>
       
       {/* Active filter chips */}
       {activeChips.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {activeChips.map((chip, index) => (
-            <FilterChip
-              key={index}
-              label={chip.label}
-              onRemove={chip.onRemove}
-            />
-          ))}
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <div className="flex flex-wrap gap-1">
+            {activeChips.map((chip, index) => (
+              <FilterChip
+                key={index}
+                label={chip.label}
+                onRemove={chip.onRemove}
+              />
+            ))}
+          </div>
+          {onClearFilters && (
+            <button
+              onClick={onClearFilters}
+              className="px-2 py-1 text-xs text-red-500 hover:text-red-600"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       )}
       
-      {/* Result count */}
-      <div className="mt-2 text-sm text-gray-600">
-        {resultCount.toLocaleString()} results
-      </div>
+      {showResultCount && (
+        <div className="mt-2 text-sm text-gray-600">
+          {resultCount.toLocaleString()} results
+        </div>
+      )}
     </div>
+  )
+}
+
+interface SortSelectProps {
+  value: FilterState['sort']
+  onChange: (value: FilterState['sort']) => void
+  className?: string
+}
+
+export function SortSelect({ value, onChange, className = '' }: SortSelectProps) {
+  const [isMobile, setIsMobile] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)')
+    const update = () => setIsMobile(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
+
+  if (isMobile) {
+    return (
+      <div ref={containerRef} className={`relative ${className}`}>
+        <button
+          type="button"
+          onClick={() => setMenuOpen(prev => !prev)}
+          className="p-2 border border-gray-300 rounded-lg text-gray-600 hover:text-gray-800 hover:border-gray-400"
+          aria-label="Sort ingredients"
+        >
+          <ArrowUpDown className="w-4 h-4" />
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+            {SORT_OPTIONS.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value as FilterState['sort'])
+                  setMenuOpen(false)
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                  value === option.value ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as FilterState['sort'])}
+      className={`px-3 py-2 border border-gray-300 rounded-lg text-sm whitespace-nowrap ${className}`}
+    >
+      {SORT_OPTIONS.map(option => (
+        <option key={option.value} value={option.value}>
+          Sort: {option.label}
+        </option>
+      ))}
+    </select>
   )
 }

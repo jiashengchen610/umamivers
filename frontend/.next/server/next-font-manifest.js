@@ -1,1 +1,1 @@
-self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/Users/chenjiashe/Desktop/Umamivers/frontend/src/app/layout\":[\"static/media/1755441e3a2fa970-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"
+self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/Users/chenjiashe/Desktop/Umamivers/umamivers/frontend/src/app/layout\":[\"static/media/1755441e3a2fa970-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"

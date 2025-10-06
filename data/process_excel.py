@@ -40,18 +40,31 @@ def clean_numeric(value: Any) -> Optional[float]:
     except ValueError:
         return None
 
-def parse_array_field(value: Any) -> List[str]:
-    """Parse comma-separated values into array"""
-    if pd.isna(value) or not value:
+def parse_list(value: Any, lower: bool = False) -> List[str]:
+    """Parse comma or semicolon separated values into list"""
+    if pd.isna(value) or value is None:
         return []
-    
+
     str_val = str(value).strip()
     if not str_val or str_val.lower() in ['nan', 'na', 'n/a', '-']:
         return []
-    
-    # Split by comma and clean each item
-    items = [item.strip() for item in str_val.split(',')]
-    return [item for item in items if item]
+
+    # Normalise delimiters to comma then split
+    str_val = str_val.replace(';', ',').replace('\n', ',')
+    items: List[str] = []
+    for item in str_val.split(','):
+        cleaned = item.strip()
+        if not cleaned:
+            continue
+        if cleaned.lower() == 'none':
+            continue
+        items.append(cleaned.lower() if lower else cleaned)
+    return items
+
+
+def parse_array_field(value: Any) -> List[str]:
+    """Backwards compatible wrapper for existing calls"""
+    return parse_list(value)
 
 def parse_json_field(value: Any) -> List[str]:
     """Parse JSON-like field or comma-separated values"""
@@ -102,12 +115,12 @@ def extract_aliases(ingredient_name: str, aliases_field: Any) -> List[tuple]:
 def process_excel_file(excel_path: str) -> None:
     """Process the Excel file and populate the database"""
     print(f"Loading Excel file: {excel_path}")
-    
+
     try:
         # Load Excel file
-        df = pd.read_excel(excel_path)
+        df = pd.read_excel(excel_path, sheet_name='Processed_Data')
         print(f"Loaded {len(df)} rows from Excel")
-        
+
         # Display columns for debugging
         print("Available columns:", list(df.columns))
         
@@ -125,45 +138,71 @@ def process_excel_file(excel_path: str) -> None:
         for index, row in df.iterrows():
             try:
                 # Extract basic ingredient info
-                ingredient_name = str(row.get('Description', '')).strip()
-                base_name = ingredient_name  # Use Description as base name
-                
+                ingredient_name = str(row.get('Ingredient', '')).strip()
+                base_name = str(row.get('Base_Name', '')).strip() or ingredient_name
+
                 if not base_name:
                     print(f"Skipping row {index}: no base name")
                     continue
-                
-                # Clean base name (remove parenthetical info for display)
-                display_name = re.sub(r'\s*\([^)]*\)', '', base_name).strip()
+
+                # Prefer the ingredient label (which includes variety metadata)
+                display_name = ingredient_name or base_name
                 category = str(row.get('Category', '')).strip() or None
-                
+                cooking_overview = str(row.get('Cooking_Overview', '')).strip() or None
+                extraction_overview = str(row.get('Umami_Extract_Overview', '')).strip() or None
+                # Merge extraction notes into cooking overview when both exist
+                if extraction_overview:
+                    combined = extraction_overview
+                    if cooking_overview:
+                        combined = f"{extraction_overview}\n{cooking_overview}"
+                    cooking_overview = combined
+
                 # Insert ingredient
                 cur.execute("""
                     INSERT INTO ingredient (base_name, display_name, category, cooking_overview)
                     VALUES (%s, %s, %s, %s) RETURNING id
-                """, (base_name, display_name, category, str(row.get('TCM_Overview', '')).strip() or None))
-                
+                """, (base_name, display_name, category, cooking_overview))
+
                 ingredient_id = cur.fetchone()[0]
-                
+
                 # Insert aliases
-                aliases = extract_aliases(ingredient_name, row.get('Aliases?'))
+                aliases = extract_aliases(ingredient_name, row.get('Variety'))
                 for alias_name, lang in aliases:
                     cur.execute("""
                         INSERT INTO alias (ingredient_id, name, language)
                         VALUES (%s, %s, %s)
                     """, (ingredient_id, alias_name, lang))
-                
+
                 # Insert chemistry data
                 glu = clean_numeric(row.get('Glu'))
                 asp = clean_numeric(row.get('Asp'))
                 imp = clean_numeric(row.get('IMP'))
                 gmp = clean_numeric(row.get('GMP'))
                 amp = clean_numeric(row.get('AMP'))
-                
+                umami_aa = clean_numeric(row.get('Umami_AA'))
+                umami_nuc = clean_numeric(row.get('Umami_Nuc'))
+
+                def to_grams(value: Optional[float]) -> float:
+                    return (value or 0) / 1000.0
+
                 # Calculate derived values if not provided
-                umami_aa = (glu or 0) + (asp or 0) if glu or asp else 0
-                umami_nuc = (imp or 0) + (gmp or 0) + (amp or 0) if imp or gmp or amp else 0
-                umami_synergy = umami_aa * umami_nuc / 100 if umami_aa and umami_nuc else 0
-                
+                if umami_aa is None:
+                    umami_aa = (glu or 0) + (asp or 0) if (glu or asp) else 0
+                if umami_nuc is None:
+                    umami_nuc = (imp or 0) + (gmp or 0) + (amp or 0) if (imp or gmp or amp) else 0
+
+                weighted_aa = to_grams(glu) * 1.0 + to_grams(asp) * 0.077
+                weighted_nuc = (
+                    to_grams(imp) * 1.0 +
+                    to_grams(gmp) * 2.3 +
+                    to_grams(amp) * 0.18
+                )
+
+                if weighted_aa > 0 and weighted_nuc > 0:
+                    umami_synergy = weighted_aa + 1218 * weighted_aa * weighted_nuc
+                else:
+                    umami_synergy = weighted_aa if weighted_aa > 0 else 0
+
                 chemistry_data = {
                     'glu': glu or 0,
                     'asp': asp or 0,
@@ -179,71 +218,37 @@ def process_excel_file(excel_path: str) -> None:
                     INSERT INTO chemistry (ingredient_id, glu, asp, imp, gmp, amp, umami_aa, umami_nuc, umami_synergy)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (ingredient_id, *chemistry_data.values()))
-                
-                # Insert TCM data - generate basic data since not in Excel
-                food_group = str(row.get('Food group', '')).strip()
-                
-                # Basic TCM mapping based on food category (simplified)
-                qi_mapping = {
-                    'Potatoes and Starches': ['Neutral'],
-                    'Vegetables': ['Cool', 'Neutral'],
-                    'Meat': ['Warm'],
-                    'Seafood': ['Cool'],
-                    'Dairy': ['Cool'],
-                    'Grains': ['Neutral'],
-                    'Fruits': ['Cool'],
-                    'Mushrooms': ['Neutral'],
-                    'Algae': ['Cold']
-                }
-                
-                flavor_mapping = {
-                    'Potatoes and Starches': ['Sweet'],
-                    'Vegetables': ['Sweet', 'Bitter'],
-                    'Meat': ['Sweet'],
-                    'Seafood': ['Salty'],
-                    'Dairy': ['Sweet'],
-                    'Grains': ['Sweet'],
-                    'Fruits': ['Sweet', 'Sour'],
-                    'Mushrooms': ['Sweet'],
-                    'Algae': ['Salty']
-                }
-                
-                # Get default values based on category
-                four_qi = qi_mapping.get(food_group, ['Neutral'])
-                five_flavors = flavor_mapping.get(food_group, ['Sweet'])
-                meridians = ['Spleen', 'Stomach']  # Default digestive meridians
-                tcm_overview = f"Traditional properties for {food_group.lower()}" if food_group else None
-                
+
+                # Insert TCM data from processed sheet
+                four_qi = parse_list(row.get('TCM_Four_Qi')) or ['Neutral']
+                five_flavors = parse_list(row.get('TCM_Five_Flavors')) or ['Sweet']
+                meridians = parse_list(row.get('TCM_Meridians')) or ['Spleen', 'Stomach']
+                tcm_overview = str(row.get('TCM_Overview', '')).strip() or None
+                tcm_confidence = clean_numeric(row.get('TCM_Data_Confidence'))
+                if tcm_confidence is None:
+                    tcm_confidence = 0.7
+
                 cur.execute("""
-                    INSERT INTO tcm (ingredient_id, four_qi, five_flavors, meridians, overview)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (ingredient_id, four_qi, five_flavors, meridians, tcm_overview))
-                
-                # Insert flags - generate basic data
-                allergens = []  # Would need allergen mapping
-                dietary = []   # Would need dietary mapping
-                
-                # Generate umami tags based on values
-                umami_tags = []
-                if umami_aa > umami_nuc:
-                    umami_tags.append('umami_aa')
-                elif umami_nuc > umami_aa:
-                    umami_tags.append('umami_nuc')
-                if umami_synergy > 50:
-                    umami_tags.append('high_synergy')
-                    
-                # Generate flavor tags based on food group
-                flavor_tags = []
-                if 'Meat' in food_group or 'Seafood' in food_group:
-                    flavor_tags.append('flavor_carrier')
-                else:
-                    flavor_tags.append('flavor_supporting')
-                
+                    INSERT INTO tcm (ingredient_id, four_qi, five_flavors, meridians, overview, confidence)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (ingredient_id, four_qi, five_flavors, meridians, tcm_overview, tcm_confidence))
+
+                # Insert flags from processed sheet
+                allergens = parse_list(row.get('Allergen'), lower=True)
+                dietary = parse_list(row.get('Dietary_Restrictions'), lower=True)
+                umami_tags = parse_list(row.get('Umami_Tags'), lower=True)
+                flavor_tags = parse_list(row.get('Flavor_Tags'), lower=True)
+
                 cur.execute("""
                     INSERT INTO flags (ingredient_id, allergens, dietary_restrictions, umami_tags, flavor_tags)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (ingredient_id, json.dumps(allergens), json.dumps(dietary), 
-                     json.dumps(umami_tags), json.dumps(flavor_tags)))
+                """, (
+                    ingredient_id,
+                    json.dumps(allergens),
+                    json.dumps(dietary),
+                    json.dumps(umami_tags),
+                    json.dumps(flavor_tags)
+                ))
                 
                 processed_count += 1
                 if processed_count % 50 == 0:

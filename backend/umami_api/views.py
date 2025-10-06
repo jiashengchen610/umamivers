@@ -359,21 +359,22 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         #       1218 = synergistic constant
         
         # Convert to g/100g (current values should already be in this unit)
-        glu_conc = float(total_glu)
-        asp_conc = float(total_asp)
-        imp_conc = float(total_imp)
-        gmp_conc = float(total_gmp)
-        amp_conc = float(total_amp)
-        
-        # Apply relative umami weights
+        def to_grams(value: Decimal) -> float:
+            return float(value) / 1000.0
+
+        glu_conc = to_grams(total_glu)
+        asp_conc = to_grams(total_asp)
+        imp_conc = to_grams(total_imp)
+        gmp_conc = to_grams(total_gmp)
+        amp_conc = to_grams(total_amp)
+
+        # Apply relative umami weights using concentrations in g/100g
         weighted_aa = (glu_conc * 1.0) + (asp_conc * 0.077)  # Glu=1, Asp=0.077
         weighted_nuc = (imp_conc * 1.0) + (gmp_conc * 2.3) + (amp_conc * 0.18)  # IMP=1, GMP=2.3, AMP=0.18
-        
+
         # Calculate EUC (Equivalent Umami Concentration)
-        euc_base = weighted_aa
-        euc_synergy = Decimal('1218') * Decimal(str(weighted_aa)) * Decimal(str(weighted_nuc))
-        total_euc = euc_base + float(euc_synergy)
-        
+        total_euc = weighted_aa + (1218 * weighted_aa * weighted_nuc if weighted_nuc > 0 else 0)
+
         # For backward compatibility, also calculate traditional values
         total_aa = total_glu + total_asp
         total_nuc = total_imp + total_gmp + total_amp

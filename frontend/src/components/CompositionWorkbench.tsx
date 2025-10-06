@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Ingredient, CompositionState, CompositionResult } from '@/types'
-import { TCMBars, UmamiChart } from '@/components/Charts'
+import { useState, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { Ingredient, CompositionState } from '@/types'
+import { TCMBars, UmamiChart, MiniBars } from '@/components/Charts'
 import { SearchBar } from '@/components/SearchAndFilter'
-import { Plus, X, Download, Share2, Save } from 'lucide-react'
+import { X, Download, Share2, Save } from 'lucide-react'
 import { composePreview } from '@/lib/api'
 
 interface CompositionWorkbenchProps {
   composition: CompositionState
   onChange: (composition: CompositionState) => void
   onSearchIngredients?: (query: string) => void
+  onOpenDetails?: (ingredient: Ingredient) => void
   className?: string
 }
 
@@ -22,13 +23,109 @@ const UNITS = [
   { value: 'cup', label: 'cup' }
 ]
 
+const UNIT_TO_GRAMS: Record<string, number> = {
+  g: 1,
+  oz: 28.35,
+  tsp: 5,
+  tbsp: 15,
+  cup: 240
+}
+
+const convertToGrams = (quantity: number, unit: string) => {
+  const multiplier = UNIT_TO_GRAMS[unit?.toLowerCase?.() || 'g'] || 1
+  return quantity * multiplier
+}
+
+const normalizeFlavorLabel = (label: string) => (label.toLowerCase() === 'spicy' ? 'Pungent' : label)
+const INTERACTIVE_SELECTOR = 'button, input, select, textarea, a, [role="button"]'
+
 export function CompositionWorkbench({ 
   composition, 
   onChange, 
   onSearchIngredients,
+  onOpenDetails,
   className = '' 
 }: CompositionWorkbenchProps) {
   const [isUpdating, setIsUpdating] = useState(false)
+
+  const resultQuantityMap = useMemo(() => {
+    const map = new Map<number, number>()
+    composition.result?.ingredients?.forEach(item => {
+      map.set(item.id, item.quantity_grams)
+    })
+    return map
+  }, [composition.result])
+
+  const {
+    aggregatedQi,
+    aggregatedFlavors,
+    aggregatedMeridians,
+    qiDistribution,
+    flavorDistribution,
+    meridianDistribution
+  } = useMemo(() => {
+    const qiWeights = new Map<string, number>()
+    const flavorWeights = new Map<string, number>()
+    const meridianWeights = new Map<string, number>()
+
+    composition.ingredients.forEach(item => {
+      const tcm = item.ingredient.tcm
+      if (!tcm) return
+
+      const weight = resultQuantityMap.get(item.ingredient.id) ?? convertToGrams(item.quantity, item.unit)
+      if (!weight || weight <= 0) return
+
+      const distribute = (values: string[] | undefined, target: Map<string, number>, transform?: (value: string) => string) => {
+        if (!values || values.length === 0) return
+        const uniqueValues = Array.from(new Set(values))
+        if (uniqueValues.length === 0) return
+        const share = weight / uniqueValues.length
+        uniqueValues.forEach(value => {
+          const key = transform ? transform(value) : value
+          target.set(key, (target.get(key) || 0) + share)
+        })
+      }
+
+      distribute(tcm.four_qi, qiWeights)
+      distribute(tcm.five_flavors, flavorWeights, normalizeFlavorLabel)
+      distribute(tcm.meridians, meridianWeights)
+    })
+
+    const toDistribution = (map: Map<string, number>) => {
+      if (map.size === 0) return undefined
+      const total = Array.from(map.values()).reduce((sum, value) => sum + value, 0)
+      if (total === 0) return undefined
+      const entries = Array.from(map.entries()).map(([label, value]) => [label, (value / total) * 100] as [string, number])
+      entries.sort((a, b) => b[1] - a[1])
+      return {
+        distribution: Object.fromEntries(entries),
+        order: entries.map(([label]) => label)
+      }
+    }
+
+    const fallbackFromIngredients = (selector: (tcm: Ingredient['tcm']) => string[] | undefined, transform?: (value: string) => string) => (
+      Array.from(new Set(
+        composition.ingredients.flatMap(item => {
+          const values = selector(item.ingredient.tcm)
+          if (!values) return []
+          return values.map(value => (transform ? transform(value) : value))
+        })
+      ))
+    )
+
+    const qiResult = toDistribution(qiWeights)
+    const flavorResult = toDistribution(flavorWeights)
+    const meridianResult = toDistribution(meridianWeights)
+
+    return {
+      aggregatedQi: qiResult?.order ?? fallbackFromIngredients(tcm => tcm?.four_qi),
+      aggregatedFlavors: flavorResult?.order ?? fallbackFromIngredients(tcm => tcm?.five_flavors, normalizeFlavorLabel),
+      aggregatedMeridians: meridianResult?.order ?? fallbackFromIngredients(tcm => tcm?.meridians),
+      qiDistribution: qiResult?.distribution,
+      flavorDistribution: flavorResult?.distribution,
+      meridianDistribution: meridianResult?.distribution
+    }
+  }, [composition.ingredients, resultQuantityMap])
 
   // Update composition when ingredients or quantities change
   useEffect(() => {
@@ -81,6 +178,24 @@ export function CompositionWorkbench({
         : item
     )
     onChange({ ...composition, ingredients: newIngredients })
+  }
+
+  const isInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement && target.closest(INTERACTIVE_SELECTOR)
+
+  const handleComboCardClick = (event: ReactMouseEvent<HTMLDivElement>, ingredient: Ingredient) => {
+    if (!onOpenDetails || isInteractiveTarget(event.target)) {
+      return
+    }
+    onOpenDetails(ingredient)
+  }
+
+  const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingredient: Ingredient) => {
+    if (!onOpenDetails) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    if (isInteractiveTarget(event.target)) return
+    event.preventDefault()
+    onOpenDetails(ingredient)
   }
 
   const addIngredient = (ingredient: Ingredient) => {
@@ -191,66 +306,84 @@ export function CompositionWorkbench({
             {composition.ingredients.length === 0 ? (
               <p className="text-gray-500 text-sm">No ingredients selected yet.</p>
             ) : (
-              composition.ingredients.map(item => (
-                <div
-                  key={item.ingredient.id}
-                  className="paper-texture-light border border-gray-200 p-4"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="font-medium">
-                        {item.ingredient.display_name || item.ingredient.base_name}
-                      </h4>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {item.ingredient.tcm?.five_flavors.join(', ')} • {item.ingredient.tcm?.four_qi.join(', ')}
+              <div className="overflow-x-auto">
+                <div className="flex gap-3 pb-2">
+                  {composition.ingredients.map(item => (
+                    <div
+                      key={item.ingredient.id}
+                      className={`paper-texture-light border border-gray-200 p-4 flex flex-col gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-colors ${onOpenDetails ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300' : ''}`}
+                      onClick={(event) => handleComboCardClick(event, item.ingredient)}
+                      onKeyDown={(event) => handleComboCardKeyDown(event, item.ingredient)}
+                      role={onOpenDetails ? 'button' : undefined}
+                      tabIndex={onOpenDetails ? 0 : undefined}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 leading-snug min-h-[2.75rem] overflow-hidden" title={item.ingredient.display_name || item.ingredient.base_name}>
+                            {item.ingredient.display_name || item.ingredient.base_name}
+                          </h4>
+                          <div className="text-xs text-gray-600 mt-1 truncate">
+                            {(item.ingredient.tcm?.five_flavors || ['Sweet']).map(normalizeFlavorLabel).join(', ')} • {(item.ingredient.tcm?.four_qi || ['Neutral']).join(', ')}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            removeIngredient(item.ingredient.id)
+                          }}
+                          className="btn-circular-sm text-gray-400 hover:text-red-500 hover:bg-red-50"
+                          aria-label={`Remove ${item.ingredient.display_name || item.ingredient.base_name}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateQuantity(item.ingredient.id, parseFloat(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 border border-gray-300 text-sm"
+                          min="0"
+                          step="0.1"
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                        <select
+                          value={item.unit}
+                          onChange={(e) => updateUnit(item.ingredient.id, e.target.value)}
+                          className="w-20 px-2 py-1 border border-gray-300 text-sm"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {UNITS.map(unit => (
+                            <option key={unit.value} value={unit.value}>
+                              {unit.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {item.ingredient.chemistry && (
+                        <MiniBars chemistry={item.ingredient.chemistry} />
+                      )}
+
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <div>
+                          <span className="font-medium">Allergens:</span>{' '}
+                          {item.ingredient.flags?.allergens?.length
+                            ? item.ingredient.flags.allergens.join(', ')
+                            : 'None reported'}
+                        </div>
+                        {item.ingredient.flags?.dietary_restrictions?.length > 0 && (
+                          <div>
+                            <span className="font-medium">Dietary:</span>{' '}
+                            {item.ingredient.flags.dietary_restrictions.slice(0, 4).join(', ')}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => removeIngredient(item.ingredient.id)}
-                      className="btn-circular-sm text-gray-400 hover:text-red-500 hover:bg-red-50"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Quantity Controls */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateQuantity(item.ingredient.id, parseFloat(e.target.value) || 0)}
-                      className="flex-1 px-2 py-1 border border-gray-300 text-sm"
-                      min="0"
-                      step="0.1"
-                    />
-                    <select
-                      value={item.unit}
-                      onChange={(e) => updateUnit(item.ingredient.id, e.target.value)}
-                      className="px-2 py-1 border border-gray-300 text-sm"
-                    >
-                      {UNITS.map(unit => (
-                        <option key={unit.value} value={unit.value}>
-                          {unit.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Badges for Umami/TCM properties */}
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {item.ingredient.flags?.umami_tags.map((tag, idx) => (
-                      <span key={idx} className="tag-element px-2 py-1 bg-orange-100 text-orange-800 text-xs">
-                        {tag}
-                      </span>
-                    ))}
-                    {item.ingredient.tcm?.meridians.map((meridian, idx) => (
-                      <span key={idx} className="tag-element px-2 py-1 bg-blue-100 text-blue-800 text-xs">
-                        {meridian}
-                      </span>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              ))
+              </div>
             )}
           </div>
         </div>
@@ -292,17 +425,16 @@ export function CompositionWorkbench({
                 {/* TCM Qi combined visualization */}
                 <TCMBars 
                   tcm={{
-                    four_qi: [...new Set(composition.ingredients.flatMap(item => 
-                      item.ingredient.tcm?.four_qi || []
-                    ))],
-                    five_flavors: [...new Set(composition.ingredients.flatMap(item => 
-                      item.ingredient.tcm?.five_flavors || []
-                    ))],
-                    meridians: [...new Set(composition.ingredients.flatMap(item => 
-                      item.ingredient.tcm?.meridians || []
-                    ))],
+                    four_qi: aggregatedQi,
+                    five_flavors: aggregatedFlavors,
+                    meridians: aggregatedMeridians,
                     overview: '',
                     confidence: 1.0
+                  }}
+                  distributions={{
+                    four_qi: qiDistribution,
+                    five_flavors: flavorDistribution,
+                    meridians: meridianDistribution
                   }}
                 />
               </div>

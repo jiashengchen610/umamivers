@@ -169,7 +169,7 @@ export default function HowToUsePage() {
           <div className="space-y-8">
             {/* Four Qi (Natures) */}
             <div className="paper-texture-light border border-gray-200 p-8">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Four Natures (四氣) - Thermal Properties</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Four Natures - Thermal Properties</h3>
               <p className="text-gray-600 mb-4">
                 The Four Natures describe how foods affect your body's internal temperature and energy circulation:
               </p>
@@ -216,7 +216,7 @@ export default function HowToUsePage() {
 
             {/* Five Flavors */}
             <div className="paper-texture-light border border-gray-200 p-8">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Five Tastes (五味) - Organ-Flavor Medicine</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Five Tastes - Organ-Flavor Medicine</h3>
               <p className="text-gray-600 mb-4">
                 Each taste corresponds to and nourishes specific organ systems in the body:
               </p>
@@ -275,7 +275,7 @@ export default function HowToUsePage() {
 
             {/* Meridians */}
             <div className="paper-texture-light border border-gray-200 p-8">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Meridian Tropism (歸經) - Energy Pathways</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Meridian Tropism - Energy Pathways</h3>
               <p className="text-gray-600 mb-4">
                 Meridian Tropism describes the specific energy pathways through which foods deliver their therapeutic effects. 
                 Each ingredient has an affinity for particular organ systems and their associated meridian channels.

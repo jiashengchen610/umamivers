@@ -275,12 +275,12 @@ export function HeroSearch({
                 </p>
               </div>
               
-              {/* Four Natures (四氣) */}
+              {/* Four Natures */}
               <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🌡️</span>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Four Natures (四氣)</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Four Natures</h3>
                 <p className="text-sm font-medium text-blue-600 mb-3">
                   Thermal Energy Balance
                 </p>
@@ -290,12 +290,12 @@ export function HeroSearch({
                 </p>
               </div>
               
-              {/* TCM Five Tastes (五味) */}
+              {/* Five Tastes */}
               <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🍃</span>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">TCM Five Tastes (五味)</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Five Tastes</h3>
                 <p className="text-sm font-medium text-green-600 mb-3">
                   Taste-Organ Medicine
                 </p>
@@ -311,7 +311,7 @@ export function HeroSearch({
                 <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🧠</span>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Meridian Tropism (歸經)</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Meridian Tropism</h3>
                 <p className="text-sm font-medium text-purple-600 mb-3">
                   Energy Pathway Guidance
                 </p>

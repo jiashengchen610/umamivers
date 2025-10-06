@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Search, X, Edit3, Plus } from 'lucide-react'
-import { FilterRow } from '@/components/SearchAndFilter'
+import { useState, useEffect, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { Search, X, Edit3 } from 'lucide-react'
+import { FilterRow, SortSelect } from '@/components/SearchAndFilter'
 import { IngredientCard } from '@/components/IngredientCard'
-import { UmamiChart } from '@/components/Charts'
+import { UmamiChart, TCMBars, MiniBars } from '@/components/Charts'
 import { Ingredient, FilterState, IngredientListResponse, CompositionState } from '@/types'
 import { searchIngredients, composePreview } from '@/lib/api'
 
@@ -31,6 +31,8 @@ const initialFilters: FilterState = {
   sort: 'relevance'
 }
 
+const INTERACTIVE_SELECTOR = 'button, input, select, textarea, a, [role="button"]'
+
 const UNITS = [
   { value: 'g', label: 'g' },
   { value: 'oz', label: 'oz' },
@@ -38,6 +40,21 @@ const UNITS = [
   { value: 'tbsp', label: 'tbsp' },
   { value: 'cup', label: 'cup' }
 ]
+
+const UNIT_TO_GRAMS: Record<string, number> = {
+  g: 1,
+  oz: 28.35,
+  tsp: 5,
+  tbsp: 15,
+  cup: 240
+}
+
+const convertToGrams = (quantity: number, unit: string) => {
+  const multiplier = UNIT_TO_GRAMS[unit?.toLowerCase?.() || 'g'] || 1
+  return quantity * multiplier
+}
+
+const normalizeFlavorLabel = (label: string) => (label.toLowerCase() === 'spicy' ? 'Pungent' : label)
 
 export function StructuredSearch({
   onAddToComposition,
@@ -55,7 +72,87 @@ export function StructuredSearch({
   const [showResults, setShowResults] = useState(false)
   const [comboTitle, setComboTitle] = useState('Combo title')
   const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [userEditedTitle, setUserEditedTitle] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [totalIngredientCount, setTotalIngredientCount] = useState<number | null>(null)
+
+  const resultQuantityMap = useMemo(() => {
+    const map = new Map<number, number>()
+    composition.result?.ingredients?.forEach(item => {
+      map.set(item.id, item.quantity_grams)
+    })
+    return map
+  }, [composition.result])
+
+  const {
+    aggregatedQi,
+    aggregatedFlavors,
+    aggregatedMeridians,
+    qiDistribution,
+    flavorDistribution,
+    meridianDistribution
+  } = useMemo(() => {
+    const qiWeights = new Map<string, number>()
+    const flavorWeights = new Map<string, number>()
+    const meridianWeights = new Map<string, number>()
+
+    composition.ingredients.forEach(item => {
+      const tcm = item.ingredient.tcm
+      if (!tcm) return
+
+      const weight = resultQuantityMap.get(item.ingredient.id) ?? convertToGrams(item.quantity, item.unit)
+      if (!weight || weight <= 0) return
+
+      const distribute = (values: string[] | undefined, target: Map<string, number>, transform?: (value: string) => string) => {
+        if (!values || values.length === 0) return
+        const uniqueValues = Array.from(new Set(values))
+        const share = weight / uniqueValues.length
+        uniqueValues.forEach(value => {
+          const key = transform ? transform(value) : value
+          target.set(key, (target.get(key) || 0) + share)
+        })
+      }
+
+      distribute(tcm.four_qi, qiWeights)
+      distribute(tcm.five_flavors, flavorWeights, normalizeFlavorLabel)
+      distribute(tcm.meridians, meridianWeights)
+    })
+
+    const toDistribution = (map: Map<string, number>) => {
+      if (map.size === 0) return undefined
+      const total = Array.from(map.values()).reduce((sum, value) => sum + value, 0)
+      if (total === 0) return undefined
+      const entries = Array.from(map.entries()).map(([label, value]) => [label, (value / total) * 100] as [string, number])
+      entries.sort((a, b) => b[1] - a[1])
+      return {
+        distribution: Object.fromEntries(entries),
+        order: entries.map(([label]) => label)
+      }
+    }
+
+    const fallback = (selector: (tcm: Ingredient['tcm']) => string[] | undefined, transform?: (value: string) => string) => (
+      Array.from(new Set(
+        composition.ingredients.flatMap(item => {
+          const values = selector(item.ingredient.tcm)
+          if (!values) return []
+          return values.map(value => (transform ? transform(value) : value))
+        })
+      ))
+    )
+
+    const qiResult = toDistribution(qiWeights)
+    const flavorResult = toDistribution(flavorWeights)
+    const meridianResult = toDistribution(meridianWeights)
+
+    return {
+      aggregatedQi: qiResult?.order ?? fallback(tcm => tcm?.four_qi),
+      aggregatedFlavors: flavorResult?.order ?? fallback(tcm => tcm?.five_flavors, normalizeFlavorLabel),
+      aggregatedMeridians: meridianResult?.order ?? fallback(tcm => tcm?.meridians),
+      qiDistribution: qiResult?.distribution,
+      flavorDistribution: flavorResult?.distribution,
+      meridianDistribution: meridianResult?.distribution
+    }
+  }, [composition.ingredients, resultQuantityMap])
 
   // Determine if filters are active
   const hasActiveQuery = filters.query.trim().length > 0
@@ -70,6 +167,42 @@ export function StructuredSearch({
 
   const shouldShowResults = hasActiveQuery || hasActiveFilters
 
+  useEffect(() => {
+    const fetchTotalCount = async () => {
+      try {
+        const response = await searchIngredients(initialFilters, 1, 1)
+        const total = response.count || 0
+        setTotalIngredientCount(total)
+        if (!shouldShowResults) {
+          setResultCount(total)
+        }
+      } catch (error) {
+        console.error('Error fetching ingredient count:', error)
+      }
+    }
+    fetchTotalCount()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (filters.sort !== 'relevance') return
+    if (filters.query.trim()) return
+
+    const mapping: Record<string, FilterState['sort']> = {
+      umami_aa: 'aa',
+      umami_nuc: 'nuc',
+      umami_synergy: 'synergy'
+    }
+
+    const targetSort = filters.umami.find(tag => mapping[tag])
+      ? mapping[filters.umami.find(tag => mapping[tag]) as keyof typeof mapping]
+      : undefined
+
+    if (targetSort && targetSort !== filters.sort) {
+      setFilters(prev => ({ ...prev, sort: targetSort }))
+    }
+  }, [filters.umami, filters.query, filters.sort])
+
   // Update composition when ingredients or quantities change
   useEffect(() => {
     updateComposition()
@@ -78,6 +211,9 @@ export function StructuredSearch({
   const updateComposition = async () => {
     if (composition.ingredients.length === 0) {
       onChange({ ...composition, result: undefined })
+      if (!userEditedTitle) {
+        setComboTitle('Combo title')
+      }
       return
     }
 
@@ -106,7 +242,7 @@ export function StructuredSearch({
   ) => {
     if (!searchFilters.query.trim() && !hasActiveFilters) {
       setIngredients([])
-      setResultCount(0)
+      setResultCount(totalIngredientCount ?? 0)
       setShowResults(false)
       return
     }
@@ -129,12 +265,12 @@ export function StructuredSearch({
     } catch (error) {
       console.error('❌ API Error:', error)
       setIngredients([])
-      setResultCount(0)
+      setResultCount(totalIngredientCount ?? 0)
       setHasMore(false)
     } finally {
       setLoading(false)
     }
-  }, [hasActiveFilters])
+  }, [hasActiveFilters, totalIngredientCount])
 
   // Search when filters change
   useEffect(() => {
@@ -155,41 +291,94 @@ export function StructuredSearch({
     setShowResults(false) // Close overlay when ingredient is added
   }
 
-  const handleClear = () => {
-    setFilters(initialFilters)
+  const handleClearComposition = () => {
     setIngredients([])
-    setResultCount(0)
     setShowResults(false)
+    onChange({ ...composition, ingredients: [], result: undefined })
   }
 
-  const removeIngredient = (ingredientId: number) => {
-    const newIngredients = composition.ingredients.filter(
-      item => item.ingredient.id !== ingredientId
-    )
-    onChange({ ...composition, ingredients: newIngredients })
-  }
+const handleClearFilters = () => {
+  setFilters(initialFilters)
+  setIngredients([])
+  setResultCount(totalIngredientCount ?? 0)
+  setShowResults(false)
+}
 
-  const updateQuantity = (ingredientId: number, quantity: number) => {
-    const newIngredients = composition.ingredients.map(item =>
-      item.ingredient.id === ingredientId
-        ? { ...item, quantity }
-        : item
-    )
-    onChange({ ...composition, ingredients: newIngredients })
-  }
+const removeIngredient = (ingredientId: number) => {
+  const newIngredients = composition.ingredients.filter(
+    item => item.ingredient.id !== ingredientId
+  )
+  onChange({ ...composition, ingredients: newIngredients })
+}
 
-  const updateUnit = (ingredientId: number, unit: string) => {
-    const newIngredients = composition.ingredients.map(item =>
-      item.ingredient.id === ingredientId
-        ? { ...item, unit }
-        : item
-    )
-    onChange({ ...composition, ingredients: newIngredients })
+const updateQuantity = (ingredientId: number, quantity: number) => {
+  const newIngredients = composition.ingredients.map(item =>
+    item.ingredient.id === ingredientId
+      ? { ...item, quantity }
+      : item
+  )
+  onChange({ ...composition, ingredients: newIngredients })
+}
+
+const updateUnit = (ingredientId: number, unit: string) => {
+  const newIngredients = composition.ingredients.map(item =>
+    item.ingredient.id === ingredientId
+      ? { ...item, unit }
+      : item
+  )
+  onChange({ ...composition, ingredients: newIngredients })
+}
+
+const isInteractiveTarget = (target: EventTarget | null) =>
+  target instanceof HTMLElement && target.closest(INTERACTIVE_SELECTOR)
+
+const handleComboCardClick = (event: ReactMouseEvent<HTMLDivElement>, ingredient: Ingredient) => {
+  if (!onOpenDetails || isInteractiveTarget(event.target)) {
+    return
   }
+  onOpenDetails(ingredient)
+}
+
+const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingredient: Ingredient) => {
+  if (!onOpenDetails) return
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  if (isInteractiveTarget(event.target)) return
+  event.preventDefault()
+  onOpenDetails(ingredient)
+}
 
   const handleTitleSave = () => {
     setIsEditingTitle(false)
+    setUserEditedTitle(comboTitle.trim().length > 0)
   }
+
+  useEffect(() => {
+    if (userEditedTitle) return
+    if (composition.ingredients.length === 0) {
+      setComboTitle('Combo title')
+      return
+    }
+
+    const weighted = composition.ingredients.map(item => {
+      const quantity = Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1
+      return {
+        name: item.ingredient.display_name || item.ingredient.base_name,
+        weight: quantity
+      }
+    })
+
+    weighted.sort((a, b) => {
+      if (b.weight !== a.weight) {
+        return b.weight - a.weight
+      }
+      return a.name.localeCompare(b.name)
+    })
+
+    const title = weighted.map(item => item.name).join(' & ')
+    if (title) {
+      setComboTitle(title)
+    }
+  }, [composition.ingredients, userEditedTitle])
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -207,7 +396,7 @@ export function StructuredSearch({
         />
         {(hasActiveQuery || hasActiveFilters) && (
           <button
-            onClick={handleClear}
+            onClick={handleClearFilters}
             className="absolute inset-y-0 right-0 pr-4 flex items-center"
           >
             <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
@@ -216,147 +405,88 @@ export function StructuredSearch({
       </div>
 
       {/* 4. Filters */}
-      <div>
-        <FilterRow
-          filters={filters}
-          onChange={handleFilterChange}
-          resultCount={resultCount}
-          compact={true}
+      <div className="flex items-start gap-3">
+        <div className="flex-1 overflow-x-auto">
+          <FilterRow
+            filters={filters}
+            onChange={handleFilterChange}
+            resultCount={resultCount}
+            compact={true}
+            onClearFilters={handleClearFilters}
+            showResultCount={false}
+          />
+        </div>
+        <SortSelect
+          value={filters.sort}
+          onChange={(value) => handleFilterChange({ ...filters, sort: value })}
+          className="flex-shrink-0"
         />
       </div>
 
       {/* 5. Result Count */}
-      {shouldShowResults && (
-        <div>
-          <p className="text-sm text-gray-600">
-            {loading ? 'Searching...' : `${resultCount} ingredients found`}
-            {hasActiveQuery && ` for "${filters.query}"`}
-          </p>
-        </div>
-      )}
+      <div>
+        <p className="text-sm text-gray-600">
+          {shouldShowResults
+            ? (loading ? 'Searching...' : `${resultCount} ingredients found${hasActiveQuery ? ` for "${filters.query}"` : ''}`)
+            : totalIngredientCount != null
+              ? `${totalIngredientCount.toLocaleString()} ingredients available`
+              : 'Loading ingredient catalog…'}
+        </p>
+      </div>
 
-      {/* 6. Combo Title and Edit Button */}
+      {/* 6. Combo Title */}
       <div className="flex items-center gap-3">
         {isEditingTitle ? (
-          <div className="flex items-center gap-2 flex-1">
-            <input
-              type="text"
-              value={comboTitle}
-              onChange={(e) => setComboTitle(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()}
-              className="text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-blue-500 focus:outline-none flex-1"
-              autoFocus
-            />
-          </div>
+          <input
+            type="text"
+            value={comboTitle}
+            onChange={(e) => setComboTitle(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()}
+            className="flex-1 text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-blue-500 focus:outline-none"
+            autoFocus
+          />
         ) : (
-          <div className="flex items-center gap-3 flex-1">
-            <h2 className="text-xl font-semibold text-gray-900">{comboTitle}</h2>
+          <>
             <button
               onClick={() => setIsEditingTitle(true)}
-              className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+              className="p-1 mr-1 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label="Edit combo title"
             >
               <Edit3 className="w-4 h-4" />
             </button>
-          </div>
+            <h2 className="text-xl font-semibold text-gray-900 flex-1">{comboTitle}</h2>
+          </>
+        )}
+        {composition.ingredients.length > 0 && (
+          <button
+            onClick={handleClearComposition}
+            className="px-3 py-2 text-sm text-red-500 hover:text-red-600"
+          >
+            Clear all
+          </button>
         )}
       </div>
 
-      {/* 7. Added Ingredient List */}
-      <div className="space-y-3">
-        {composition.ingredients.length === 0 ? (
-          <p className="text-gray-500 text-center py-8 bg-gray-50 rounded-xl">
-            No ingredients selected yet. Search and add ingredients above.
-          </p>
-        ) : (
-          composition.ingredients.map(item => (
-            <div
-              key={item.ingredient.id}
-              className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-4"
+      {composition.ingredients.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {composition.ingredients.map(item => (
+            <button
+              type="button"
+              key={`chip-${item.ingredient.id}`}
+              onClick={() => removeIngredient(item.ingredient.id)}
+              className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-xs font-medium text-gray-700 border border-gray-300 transition-colors"
             >
-              {/* Ingredient Info */}
-              <div className="flex-1">
-                <h4 className="font-medium text-gray-900 mb-1">
-                  {item.ingredient.display_name || item.ingredient.base_name}
-                </h4>
-                <div className="text-xs text-gray-500 mb-2">
-                  {item.ingredient.tcm?.five_flavors.join(', ')} • {item.ingredient.tcm?.four_qi.join(', ')}
-                </div>
-              </div>
+              {item.ingredient.display_name || item.ingredient.base_name}
+              <span className="ml-2 text-gray-500">×</span>
+            </button>
+          ))}
+        </div>
+      )}
 
-              {/* Quantity Input */}
-              <div className="flex items-center gap-2 min-w-[120px]">
-                <input
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) => updateQuantity(item.ingredient.id, parseFloat(e.target.value) || 0)}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center"
-                  min="0"
-                  step="0.1"
-                />
-                <select
-                  value={item.unit}
-                  onChange={(e) => updateUnit(item.ingredient.id, e.target.value)}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm"
-                >
-                  {UNITS.map(unit => (
-                    <option key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Small Umami Chart */}
-              {item.ingredient.chemistry && (
-                <div className="min-w-[80px]">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
-                      <div className="flex-1 h-1 bg-gray-200 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-orange-500 transition-all duration-300"
-                          style={{ width: `${Math.min(100, (parseFloat(item.ingredient.chemistry.umami_aa?.toString() || '0') / 1000) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></div>
-                      <div className="flex-1 h-1 bg-gray-200 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-yellow-600 transition-all duration-300"
-                          style={{ width: `${Math.min(100, (parseFloat(item.ingredient.chemistry.umami_nuc?.toString() || '0') / 500) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                      <div className="flex-1 h-1 bg-gray-200 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-purple-400 transition-all duration-300"
-                          style={{ width: `${Math.min(100, (parseFloat(item.ingredient.chemistry.umami_synergy?.toString() || '0') / 1500) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Remove Button */}
-              <button
-                onClick={() => removeIngredient(item.ingredient.id)}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* 8. Aggregated Chart */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        {composition.result ? (
+      {/* 7. Composition Analytics */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+        {composition.ingredients.length > 0 && composition.result ? (
           <>
             <UmamiChart
               chemistry={{
@@ -371,94 +501,132 @@ export function StructuredSearch({
               }}
               showIndividual={false}
             />
-            {isUpdating && (
-              <div className="flex items-center justify-center mt-4">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-              </div>
-            )}
-            
-            {/* Export Options */}
-            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                <span>💾</span>
-                Save
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors">
-                <span>📤</span>
-                Share
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-colors">
-                <span>📊</span>
-                PNG
-              </button>
-            </div>
+            <TCMBars
+              tcm={{
+                four_qi: aggregatedQi,
+                five_flavors: aggregatedFlavors,
+                meridians: aggregatedMeridians,
+                overview: '',
+                confidence: 1
+              }}
+              distributions={{
+                four_qi: qiDistribution,
+                five_flavors: flavorDistribution,
+                meridians: meridianDistribution
+              }}
+            />
           </>
         ) : (
-          /* Empty State Template */
-          <div className="text-center py-12">
-            <div className="mb-6">
-              <div className="inline-block p-4 bg-gray-100 rounded-2xl mb-4">
-                <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Your Umami Profile Awaits</h3>
-              <p className="text-gray-600 max-w-md mx-auto mb-6">
-                Add ingredients above to see their combined umami synergy, TCM balance, and flavor profile analysis.
-              </p>
-              
-              {/* Preview Template */}
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 max-w-md mx-auto">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-500 min-w-[80px] text-left">Amino Acids</span>
-                    <div className="flex-1 h-4 bg-gray-200 rounded overflow-hidden">
-                      <div className="h-full bg-orange-300 opacity-50" style={{width: '0%'}} />
+          <div className="flex flex-col items-center text-sm text-gray-500 gap-3">
+            {isUpdating ? (
+              <>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <span>Calculating composition…</span>
+              </>
+            ) : (
+              <span>Add ingredients to preview umami and TCM analytics.</span>
+            )}
+          </div>
+        )}
+
+        {isUpdating && composition.result && (
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+          </div>
+        )}
+      </div>
+
+      {/* 8. Added Ingredient List */}
+      <div className="space-y-3">
+        {composition.ingredients.length === 0 ? (
+          <p className="text-gray-500 text-center py-8 bg-gray-50 rounded-xl">
+            No ingredients selected yet. Search and add ingredients above.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="flex gap-3 pb-2">
+              {composition.ingredients.map(item => (
+                <div
+                  key={item.ingredient.id}
+                  className={`paper-texture-light border border-gray-200 p-4 flex flex-col gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-colors ${onOpenDetails ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300' : ''}`}
+                  onClick={(event) => handleComboCardClick(event, item.ingredient)}
+                  onKeyDown={(event) => handleComboCardKeyDown(event, item.ingredient)}
+                  role={onOpenDetails ? 'button' : undefined}
+                  tabIndex={onOpenDetails ? 0 : undefined}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <h4 className="text-base font-medium text-gray-900 leading-snug min-h-[2.75rem] overflow-hidden" title={item.ingredient.display_name || item.ingredient.base_name}>
+                        {item.ingredient.display_name || item.ingredient.base_name}
+                      </h4>
+                      <div className="text-xs text-gray-600 mt-1 truncate">
+                        {(item.ingredient.tcm?.five_flavors || ['Sweet']).map(normalizeFlavorLabel).join(', ')} • {(item.ingredient.tcm?.four_qi || ['Neutral']).join(', ')}
+                      </div>
                     </div>
-                    <span className="text-sm text-gray-400 min-w-[35px]">0.0</span>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        removeIngredient(item.ingredient.id)
+                      }}
+                      className="btn-circular-sm text-gray-400 hover:text-red-500 hover:bg-red-50"
+                      aria-label={`Remove ${item.ingredient.display_name || item.ingredient.base_name}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-500 min-w-[80px] text-left">Nucleotides</span>
-                    <div className="flex-1 h-4 bg-gray-200 rounded overflow-hidden">
-                      <div className="h-full bg-yellow-400 opacity-50" style={{width: '0%'}} />
-                    </div>
-                    <span className="text-sm text-gray-400 min-w-[35px]">0.0</span>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateQuantity(item.ingredient.id, parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 border border-gray-300 text-sm"
+                      min="0"
+                      step="0.1"
+                      onClick={(event) => event.stopPropagation()}
+                    />
+                    <select
+                      value={item.unit}
+                      onChange={(e) => updateUnit(item.ingredient.id, e.target.value)}
+                      className="w-20 px-2 py-1 border border-gray-300 text-sm"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {UNITS.map(unit => (
+                        <option key={unit.value} value={unit.value}>{unit.label}</option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-500 min-w-[80px] text-left">Synergy</span>
-                    <div className="flex-1 h-4 bg-gray-200 rounded overflow-hidden">
-                      <div className="h-full bg-purple-400 opacity-50" style={{width: '0%'}} />
+
+                  {item.ingredient.chemistry && (
+                    <MiniBars chemistry={item.ingredient.chemistry} />
+                  )}
+
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>
+                      <span className="font-medium">Allergens:</span>{' '}
+                      {item.ingredient.flags?.allergens?.length
+                        ? item.ingredient.flags.allergens.join(', ')
+                        : 'None reported'}
                     </div>
-                    <span className="text-sm text-gray-400 min-w-[35px]">0.0</span>
+                    <div>
+                      <span className="font-medium">TCM:</span>{' '}
+                      {(item.ingredient.tcm?.five_flavors || ['Sweet']).map(normalizeFlavorLabel).join(', ')} • {(item.ingredient.tcm?.four_qi || ['Neutral']).join(', ')}
+                    </div>
+                    {item.ingredient.flags?.dietary_restrictions?.length > 0 && (
+                      <div>
+                        <span className="font-medium">Dietary:</span>{' '}
+                        {item.ingredient.flags.dietary_restrictions.slice(0, 4).join(', ')}
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 mb-3">Ready to export as:</p>
-                  <div className="flex justify-center gap-2">
-                    <div className="tag-element px-3 py-1 bg-gray-200 text-gray-500 text-xs">
-                      Save
-                    </div>
-                    <div className="tag-element px-3 py-1 bg-gray-200 text-gray-500 text-xs">
-                      Share
-                    </div>
-                    <div className="tag-element px-3 py-1 bg-gray-200 text-gray-500 text-xs">
-                      PNG
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="text-sm text-gray-500 mt-6">
-              <strong>Tip:</strong> Combine ingredients with high amino acids and nucleotides for maximum umami synergy!
+              ))}
             </div>
           </div>
         )}
       </div>
 
-
-      {/* Enhanced Results Overlay with Search/Filters */}
+      {/* 9. Composition Summary */}
       {shouldShowResults && showResults && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{
           background: 'rgba(255, 255, 255, 0.95)', // Increased opacity
@@ -489,12 +657,23 @@ export function StructuredSearch({
               </div>
 
               {/* Filters */}
-              <FilterRow
-                filters={filters}
-                onChange={handleFilterChange}
-                resultCount={resultCount}
-                compact={true}
-              />
+              <div className="flex items-start gap-3">
+                <div className="flex-1 overflow-x-auto">
+                  <FilterRow
+                    filters={filters}
+                    onChange={handleFilterChange}
+                    resultCount={resultCount}
+                    compact={true}
+                    onClearFilters={handleClearFilters}
+                    showResultCount={false}
+                  />
+                </div>
+                <SortSelect
+                  value={filters.sort}
+                  onChange={(value) => handleFilterChange({ ...filters, sort: value })}
+                  className="flex-shrink-0"
+                />
+              </div>
             </div>
           </div>
 
@@ -515,9 +694,9 @@ export function StructuredSearch({
 
               {/* Results Grid - Mobile optimized */}
               {ingredients.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 mb-6">
                   {ingredients.map((ingredient) => (
-                    <div key={ingredient.id} className="paper-texture-light border border-gray-300">
+                    <div key={ingredient.id} className="paper-texture-light border border-gray-300 h-full">
                       <IngredientCard
                         ingredient={ingredient}
                         onAddToComposition={handleAddIngredient}
