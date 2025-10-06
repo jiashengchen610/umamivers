@@ -1,5 +1,6 @@
 from django.db import connection
 from django.db.models import Q, F
+from django.contrib.postgres.search import TrigramSimilarity
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -77,7 +78,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         allergens_exclude = self.request.query_params.getlist('allergens_exclude[]')
         
         # Dietary filters
-        dietary_filters = self.request.query_params.getlist('dietary[]')
+        dietary_filters = self.request.query_params.getlist('dietary[]') or self.request.query_params.getlist('dietary')
         
         # Category filters
         category_filters = self.request.query_params.getlist('category[]')
@@ -142,46 +143,30 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.distinct()
 
     def _apply_fuzzy_search(self, queryset, query):
-        """Apply fuzzy search using PostgreSQL trigram similarity"""
-        # Search in ingredient names and aliases
-        search_query = Q()
-        
-        # Direct name search with similarity
-        search_query |= Q(base_name__icontains=query)
-        search_query |= Q(display_name__icontains=query)
-        
-        # Alias search
-        search_query |= Q(aliases__name__icontains=query)
-        
-        # Use raw SQL for trigram search for better performance
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT DISTINCT i.id, 
-                       GREATEST(
-                           similarity(i.base_name, %s),
-                           similarity(i.display_name, %s),
-                           COALESCE(MAX(similarity(a.name, %s)), 0)
-                       ) as search_score
-                FROM ingredient i
-                LEFT JOIN alias a ON i.id = a.ingredient_id
-                WHERE similarity(i.base_name, %s) > 0.1 
-                   OR similarity(i.display_name, %s) > 0.1
-                   OR similarity(a.name, %s) > 0.1
-                GROUP BY i.id, i.base_name, i.display_name
-                ORDER BY search_score DESC
-            """, [query, query, query, query, query, query])
-            
-            ingredient_ids = [row[0] for row in cursor.fetchall()]
-            
-        if ingredient_ids:
-            # Preserve order from the similarity search
-            ordering = 'FIELD(`id`, %s)' % ','.join(str(id) for id in ingredient_ids)
-            queryset = queryset.filter(id__in=ingredient_ids)
-        else:
-            # Fallback to basic search
-            queryset = queryset.filter(search_query)
-            
-        return queryset
+        """Apply trigram similarity across names and aliases with weighted score"""
+        # Compute trigram similarity for base/display names
+        qs = queryset.annotate(
+            sim_base=TrigramSimilarity('base_name', query),
+            sim_display=TrigramSimilarity('display_name', query),
+        )
+        # Best name similarity
+        qs = qs.annotate(sim_name=F('sim_base') + F('sim_display'))
+
+        # Approximate alias similarity using EXISTS filter; we can't aggregate easily without GROUP BY, so
+        # we boost items that have any alias containing the query, and otherwise rely on name similarity.
+        alias_match = Q(aliases__name__icontains=query)
+        qs = qs.annotate(
+            sim_alias=F('sim_name')  # placeholder to keep types
+        )
+        # Filter low-similarity quickly
+        qs = qs.filter(Q(sim_name__gt=0.05) | alias_match | Q(base_name__icontains=query) | Q(display_name__icontains=query))
+
+        # Weighted score: names weighted higher than alias presence
+        qs = qs.annotate(
+            score=F('sim_name') * 0.9 + F('sim_base') * 0.1
+        ).order_by('-score')
+
+        return qs
 
     def _apply_umami_filters(self, queryset, umami_filters):
         """Apply umami-related filters (OR within group)"""
@@ -247,12 +232,66 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
     def _apply_dietary_filters(self, queryset, dietary_filters):
-        """Apply dietary restriction filters (OR within group)"""
-        dietary_query = Q()
-        for dietary in dietary_filters:
-            dietary_query |= Q(flags__dietary_restrictions__contains=[dietary])
-        
-        return queryset.filter(dietary_query)
+        """Apply dietary restriction filters with inclusive logic
+        vegan -> vegan
+        vegetarian -> vegetarian OR vegan
+        pescatarian -> pescatarian OR vegetarian OR vegan
+        non_vegetarian -> pescatarian OR (not vegan AND not vegetarian AND not pescatarian)
+        """
+        if not dietary_filters:
+            return queryset
+
+        # Special-case when only Non-vegetarian is selected to avoid OR-inflation
+        normalized = { (f or '').lower() for f in dietary_filters }
+        if normalized == {'non_vegetarian'}:
+            return (
+                queryset
+                .exclude(flags__dietary_restrictions__contains=['vegan'])
+                .exclude(flags__dietary_restrictions__contains=['vegetarian'])
+                .filter(
+                    Q(flags__dietary_restrictions__contains=['pescatarian']) |
+                    Q(flags__dietary_restrictions__contains=['non_vegetarian'])
+                )
+            )
+
+        combined_query = Q()
+
+        def contains_any(values):
+            q = Q()
+            for v in values:
+                q |= Q(flags__dietary_restrictions__contains=[v])
+            return q
+
+        for flt in dietary_filters:
+            key = (flt or '').lower()
+            vegan = ['vegan', 'Vegan', 'VEGAN']
+            vegetarian = ['vegetarian', 'Vegetarian', 'VEGETARIAN']
+            pescatarian = ['pescatarian', 'Pescatarian', 'PESCATARIAN']
+
+            if key == 'vegan':
+                combined_query |= contains_any(vegan)
+            elif key == 'vegetarian':
+                combined_query |= (contains_any(vegetarian) | contains_any(vegan))
+            elif key == 'pescatarian':
+                combined_query |= (contains_any(pescatarian) | contains_any(vegetarian) | contains_any(vegan))
+            elif key == 'non_vegetarian':
+                combined_query |= (
+                    # include pescatarian explicitly
+                    contains_any(pescatarian) |
+                    # include items that have dietary info and are not vegan/vegetarian/pescatarian
+                    (
+                        ~contains_any(vegan) &
+                        ~contains_any(vegetarian) &
+                        ~contains_any(pescatarian) &
+                        Q(flags__dietary_restrictions__isnull=False) &
+                        ~Q(flags__dietary_restrictions=[])  # exclude unknown/unspecified
+                    )
+                )
+            else:
+                # Fallback to exact contains for any unknown tag
+                combined_query |= Q(flags__dietary_restrictions__contains=[flt])
+
+        return queryset.filter(combined_query)
 
     def _apply_category_filters(self, queryset, category_filters):
         """Apply category filters (OR within group)"""
@@ -299,6 +338,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         total_imp = Decimal('0')
         total_gmp = Decimal('0')
         total_amp = Decimal('0')
+        total_weight = Decimal('0')
         
         ingredients_data = []
         
@@ -306,35 +346,36 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
             ingredient_id = item['ingredient_id']
             quantity = item['quantity']
             unit = item['unit']
-            
+
             try:
                 ingredient = Ingredient.objects.select_related('chemistry').get(id=ingredient_id)
                 chemistry = ingredient.chemistry
-                
+
                 # Convert to grams
-                quantity_grams = convert_to_grams(float(quantity), unit)
-                
+                quantity_grams = Decimal(str(convert_to_grams(float(quantity), unit)))
+                total_weight += quantity_grams
+
                 # Calculate contribution (assuming chemistry values are per 100g)
-                factor = Decimal(str(quantity_grams / 100.0))
-                
+                factor = quantity_grams / Decimal('100')
+
                 contrib_glu = chemistry.glu * factor
                 contrib_asp = chemistry.asp * factor
                 contrib_imp = chemistry.imp * factor
                 contrib_gmp = chemistry.gmp * factor
                 contrib_amp = chemistry.amp * factor
-                
+
                 total_glu += contrib_glu
                 total_asp += contrib_asp
                 total_imp += contrib_imp
                 total_gmp += contrib_gmp
                 total_amp += contrib_amp
-                
+
                 ingredients_data.append({
                     'id': ingredient.id,
                     'name': ingredient.display_name or ingredient.base_name,
                     'quantity': quantity,
                     'unit': unit,
-                    'quantity_grams': quantity_grams,
+                    'quantity_grams': float(quantity_grams),
                     'contributions': {
                         'glu': float(contrib_glu),
                         'asp': float(contrib_asp),
@@ -343,7 +384,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
                         'amp': float(contrib_amp),
                     }
                 })
-                
+
             except Ingredient.DoesNotExist:
                 return Response(
                     {'error': f'Ingredient with id {ingredient_id} not found'}, 
@@ -358,58 +399,79 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         #       bj = relative umami weights for nucleotides (IMP=1, GMP=2.3, AMP=0.18)
         #       1218 = synergistic constant
         
-        # Convert to g/100g (current values should already be in this unit)
-        def to_grams(value: Decimal) -> float:
-            return float(value) / 1000.0
+        if total_weight == 0:
+            return Response(
+                {'error': 'Total weight must be greater than zero'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        glu_conc = to_grams(total_glu)
-        asp_conc = to_grams(total_asp)
-        imp_conc = to_grams(total_imp)
-        gmp_conc = to_grams(total_gmp)
-        amp_conc = to_grams(total_amp)
+        def mg_per_100g(total_mg: Decimal) -> Decimal:
+            return (total_mg / total_weight) * Decimal('100')
 
-        # Apply relative umami weights using concentrations in g/100g
-        weighted_aa = (glu_conc * 1.0) + (asp_conc * 0.077)  # Glu=1, Asp=0.077
-        weighted_nuc = (imp_conc * 1.0) + (gmp_conc * 2.3) + (amp_conc * 0.18)  # IMP=1, GMP=2.3, AMP=0.18
+        glu_mg_per_100g = mg_per_100g(total_glu)
+        asp_mg_per_100g = mg_per_100g(total_asp)
+        imp_mg_per_100g = mg_per_100g(total_imp)
+        gmp_mg_per_100g = mg_per_100g(total_gmp)
+        amp_mg_per_100g = mg_per_100g(total_amp)
+
+        glu_g_per_100g = glu_mg_per_100g / Decimal('1000')
+        asp_g_per_100g = asp_mg_per_100g / Decimal('1000')
+        imp_g_per_100g = imp_mg_per_100g / Decimal('1000')
+        gmp_g_per_100g = gmp_mg_per_100g / Decimal('1000')
+        amp_g_per_100g = amp_mg_per_100g / Decimal('1000')
+
+        total_aa_g_per_100g = glu_g_per_100g + asp_g_per_100g
+        total_nuc_g_per_100g = imp_g_per_100g + gmp_g_per_100g + amp_g_per_100g
+
+        weighted_aa = glu_g_per_100g + (asp_g_per_100g * Decimal('0.077'))
+        weighted_nuc = imp_g_per_100g + (gmp_g_per_100g * Decimal('2.3')) + (amp_g_per_100g * Decimal('0.18'))
 
         # Calculate EUC (Equivalent Umami Concentration)
-        total_euc = weighted_aa + (1218 * weighted_aa * weighted_nuc if weighted_nuc > 0 else 0)
+        total_euc = weighted_aa + (Decimal('1218') * weighted_aa * weighted_nuc if weighted_nuc > 0 else Decimal('0'))
 
         # For backward compatibility, also calculate traditional values
         total_aa = total_glu + total_asp
         total_nuc = total_imp + total_gmp + total_amp
-        total_synergy = Decimal(str(total_euc))
-        
+        total_synergy = total_euc
+
         # Prepare chart data
         chart_data = {
             'umami_aa': {
-                'glu': float(total_glu),
-                'asp': float(total_asp)
+                'glu': float(glu_mg_per_100g),
+                'asp': float(asp_mg_per_100g)
             },
             'umami_nuc': {
-                'imp': float(total_imp),
-                'gmp': float(total_gmp),
-                'amp': float(total_amp)
+                'imp': float(imp_mg_per_100g),
+                'gmp': float(gmp_mg_per_100g),
+                'amp': float(amp_mg_per_100g)
             },
             'breakdown': {
-                'total_aa': float(total_aa),
-                'total_nuc': float(total_nuc),
+                'total_aa': float(total_aa_g_per_100g),
+                'total_nuc': float(total_nuc_g_per_100g),
                 'total_synergy': float(total_synergy)
             }
         }
-        
+
         result = {
-            'total_aa': total_aa,
-            'total_nuc': total_nuc,
-            'total_synergy': total_synergy,
-            'total_glu': total_glu,
-            'total_asp': total_asp,
-            'total_imp': total_imp,
-            'total_gmp': total_gmp,
-            'total_amp': total_amp,
+            'total_weight': float(total_weight),
+            'total_aa': float(total_aa),
+            'total_nuc': float(total_nuc),
+            'total_synergy': float(total_synergy),
+            'total_glu': float(total_glu),
+            'total_asp': float(total_asp),
+            'total_imp': float(total_imp),
+            'total_gmp': float(total_gmp),
+            'total_amp': float(total_amp),
             'ingredients': ingredients_data,
-            'chart_data': chart_data
+            'chart_data': chart_data,
+            'concentrations': {
+                'aa_mg_per_100g': float(glu_mg_per_100g + asp_mg_per_100g),
+                'nuc_mg_per_100g': float(imp_mg_per_100g + gmp_mg_per_100g + amp_mg_per_100g),
+                'aa_g_per_100g': float(total_aa_g_per_100g),
+                'nuc_g_per_100g': float(total_nuc_g_per_100g),
+                'synergy_g_per_100g': float(total_synergy)
+            }
         }
-        
+
         result_serializer = CompositionResultSerializer(result)
         return Response(result_serializer.data)
