@@ -169,6 +169,12 @@ export function CompositionWorkbench({
       }))
 
       const result = await composePreview(compositionData)
+      console.log('Composition result:', { 
+        pui: result.pui, 
+        aa_nuc_ratio: result.aa_nuc_ratio, 
+        synergy_zone: result.synergy_zone,
+        has_new_fields: !!(result.pui && result.aa_nuc_ratio)
+      })
       onChange({ ...composition, result })
     } catch (error) {
       console.error('Error updating composition:', error)
@@ -314,7 +320,10 @@ export function CompositionWorkbench({
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Umami Builder</h2>
+        <div>
+          <h2 className="text-2xl font-bold">Umami Builder</h2>
+          <span className="text-xs text-gray-400">v2.0-pui</span>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={handleSave}
