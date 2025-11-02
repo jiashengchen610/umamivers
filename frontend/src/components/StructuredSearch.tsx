@@ -523,15 +523,6 @@ const handleAddWater = () => {
             <h2 className="text-xl font-semibold text-gray-900 flex-1">{comboTitle}</h2>
           </>
         )}
-        {composition.ingredients.length > 0 && waterIngredient && (
-          <button
-            onClick={handleAddWater}
-            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <Droplet className="w-4 h-4" />
-            Dilute with water
-          </button>
-        )}
         {composition.ingredients.length > 0 && (
           <button
             onClick={handleClearComposition}
@@ -670,6 +661,20 @@ const handleAddWater = () => {
         ) : (
           <div className="overflow-x-auto">
             <div className="flex gap-3 pb-2">
+              {/* Dilute with Water Button */}
+              {waterIngredient && (
+                <button
+                  onClick={handleAddWater}
+                  className="paper-texture-light border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 p-4 flex flex-col items-center justify-center gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-all"
+                >
+                  <Droplet className="w-8 h-8 text-blue-600" />
+                  <div className="text-center">
+                    <div className="text-base font-medium text-blue-900">Dilute with water</div>
+                    <div className="text-xs text-blue-700 mt-1">+100g each click</div>
+                  </div>
+                </button>
+              )}
+              
               {composition.ingredients.map(item => (
                 <div
                   key={item.ingredient.id}
