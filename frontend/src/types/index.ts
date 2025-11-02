@@ -84,6 +84,10 @@ export interface CompositionResult {
   total_imp: number
   total_gmp: number
   total_amp: number
+  pui?: number
+  aa_nuc_ratio?: number
+  synergy_zone?: 'needs_aa' | 'optimal' | 'needs_nuc'
+  synergy_suggestion?: string
   ingredients: Array<{
     id: number
     name: string

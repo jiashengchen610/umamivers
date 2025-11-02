@@ -7,6 +7,7 @@ import { SearchBar } from '@/components/SearchAndFilter'
 import { X, Download, Share2, Save, Droplet } from 'lucide-react'
 import { composePreview, searchIngredients } from '@/lib/api'
 import { getUmamiLevel, gToMg } from '@/lib/umamiLevels'
+import SynergyRatioDial from '@/components/SynergyRatioDial'
 
 interface CompositionWorkbenchProps {
   composition: CompositionState
@@ -472,30 +473,55 @@ export function CompositionWorkbench({
             />
           </div>
 
-          {/* Umami Level Indicator */}
+          {/* Umami Strength Display: Dual EUC/PUI */}
           {composition.result && composition.ingredients.length > 0 && (() => {
             const totalAA = parseFloat(String(composition.result.total_aa))
             const totalNuc = parseFloat(String(composition.result.total_nuc))
             const totalSynergy = parseFloat(String(composition.result.total_synergy))
             const totalUmami = totalAA + totalNuc + totalSynergy
+            const pui = composition.result.pui ?? 0
             const level = getUmamiLevel(totalUmami)
             
             return (
-              <div className="paper-texture-light border border-gray-200 p-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium text-gray-700">Flavor Balance</h4>
-                    <span className={`text-sm font-medium ${level.textColor}`}>
-                      {level.name}
-                    </span>
+              <div className="paper-texture-light border border-gray-200 p-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Umami Strength</h4>
+                <div className="space-y-4">
+                  {/* Dual display: Chemical and Perceived */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-600">Chemical (EUC)</span>
+                      <span className={`text-2xl font-light ${level.textColor}`}>
+                        {totalUmami.toFixed(1)} <span className="text-sm">mg/100g</span>
+                      </span>
+                      <span className={`text-xs ${level.textColor}`}>{level.name}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-600">Perceived (PUI)</span>
+                      <span className="text-2xl font-light text-fuchsia-700">
+                        {pui.toFixed(1)} <span className="text-sm">/ 100</span>
+                      </span>
+                      <span className="text-xs text-gray-600">Sensory intensity</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    {level.suggestion}
-                  </p>
+                  {/* Suggestion */}
+                  <div className="pt-2 border-t border-gray-200">
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {level.suggestion}
+                    </p>
+                  </div>
                 </div>
               </div>
             )
           })()}
+
+          {/* Synergy Ratio Dial */}
+          {composition.result && composition.ingredients.length > 0 && composition.result.aa_nuc_ratio !== undefined && (
+            <SynergyRatioDial
+              ratio={composition.result.aa_nuc_ratio}
+              zone={composition.result.synergy_zone || 'optimal'}
+              suggestion={composition.result.synergy_suggestion || 'Calculating synergy...'}
+            />
+          )}
 
           {/* TCM Combined Analysis - placeholder for now */}
           {composition.result && composition.ingredients.length > 0 && (

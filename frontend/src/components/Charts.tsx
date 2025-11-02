@@ -340,12 +340,21 @@ export function MiniBars({ chemistry, className = '' }: MiniBarsProps) {
   const aaValue = Number(chemistry.umami_aa || 0)
   const nucValue = Number(chemistry.umami_nuc || 0)
   const synValue = Number(chemistry.umami_synergy || 0)
-  const maxValue = Math.max(aaValue, nucValue, synValue, 1)
+  
+  // P95 normalization caps (mg/100g)
+  const P95_AA = 300
+  const P95_NUC = 50
+  const P95_SYN = 2600
+  
+  // Calculate normalized percentages
+  const aaNormalized = Math.min((aaValue / P95_AA) * 100, 100)
+  const nucNormalized = Math.min((nucValue / P95_NUC) * 100, 100)
+  const synNormalized = Math.min((synValue / P95_SYN) * 100, 100)
 
   const rows = [
-    { label: 'AA', value: aaValue, displayValue: formatUmamiMg(aaValue), color: 'bg-umami-aa' },
-    { label: 'Nuc', value: nucValue, displayValue: formatUmamiMg(nucValue), color: 'bg-umami-nuc' },
-    { label: 'Syn', value: synValue, displayValue: formatUmamiMg(synValue), color: 'bg-umami-synergy' }
+    { label: 'AA', value: aaValue, displayValue: formatUmamiMg(aaValue), color: 'bg-umami-aa', normalized: aaNormalized },
+    { label: 'Nuc', value: nucValue, displayValue: formatUmamiMg(nucValue), color: 'bg-umami-nuc', normalized: nucNormalized },
+    { label: 'Syn', value: synValue, displayValue: formatUmamiMg(synValue), color: 'bg-umami-synergy', normalized: synNormalized }
   ]
 
   return (
@@ -357,7 +366,8 @@ export function MiniBars({ chemistry, className = '' }: MiniBarsProps) {
           <div className="h-2 bg-gray-200 rounded overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${row.color}`}
-              style={{ width: `${(row.value / maxValue) * 100}%` }}
+              style={{ width: `${row.normalized}%` }}
+              title={`${row.displayValue} mg (${row.normalized.toFixed(0)}% of P95)`}
             />
           </div>
         </div>

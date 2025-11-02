@@ -40,8 +40,8 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
       level: 'biological',
       name: 'Biological Range',
       range: '10-80 mg/100g',
-      color: 'text-gray-900',
-      textColor: 'text-gray-900',
+      color: 'text-fuchsia-600',
+      textColor: 'text-fuchsia-600',
       suggestion: 'Natural umami perception. Add mild umami boosters for better balance.'
     }
   }
@@ -51,8 +51,8 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
       level: 'culinary-optimal',
       name: 'Culinary Optimal',
       range: '80-300 mg/100g',
-      color: 'text-gray-900',
-      textColor: 'text-gray-900',
+      color: 'text-fuchsia-700',
+      textColor: 'text-fuchsia-700',
       suggestion: 'Ideal balanced flavor zone. Maintain the current balance for best results.'
     }
   }
@@ -62,8 +62,8 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
       level: 'strong',
       name: 'Strong Umami',
       range: '300-500 mg/100g',
-      color: 'text-red-600',
-      textColor: 'text-red-600',
+      color: 'text-fuchsia-800',
+      textColor: 'text-fuchsia-800',
       suggestion: 'Very rich flavor near the practical upper culinary limit. Consider slightly reducing umami-heavy ingredients.'
     }
   }
@@ -73,8 +73,8 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
       level: 'overlimit',
       name: 'Overlimit Zone',
       range: '500-2600 mg/100g',
-      color: 'text-red-600',
-      textColor: 'text-red-600',
+      color: 'text-fuchsia-900',
+      textColor: 'text-fuchsia-900',
       suggestion: 'Exceeding normal culinary range. Reduce umami-rich ingredients significantly to restore balance.'
     }
   }
@@ -84,8 +84,8 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
     level: 'theoretical-max',
     name: 'Theoretical Maximum',
     range: '2600-3300 mg/100g',
-    color: 'text-red-600',
-    textColor: 'text-red-600',
+    color: 'text-fuchsia-950',
+    textColor: 'text-fuchsia-950',
     suggestion: 'Deep umami saturation. Use dilution or add contrasting flavors for better harmony and complexity.'
   }
 }

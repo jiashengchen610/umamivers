@@ -436,6 +436,43 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             euc_mg = Decimal('0')
 
+        # Calculate PUI (Perceived Umami Index)
+        # P_AA = 1 / (1 + (K_AA / AA_mix_mg)^n)  where K_AA=80, n=1.4
+        # B_Nuc = 1 + α * (Nuc_mix_mg / (Nuc_mix_mg + K_Nuc))  where α=1.5, K_Nuc=30
+        # PUI = min(P_AA * B_Nuc, 1) * 100
+        K_AA = Decimal('80')
+        n = Decimal('1.4')
+        alpha = Decimal('1.5')
+        K_Nuc = Decimal('30')
+        
+        if aa_mix_mg > 0:
+            p_aa = Decimal('1') / (Decimal('1') + pow(K_AA / aa_mix_mg, n))
+        else:
+            p_aa = Decimal('0')
+        
+        if nuc_mix_mg > 0:
+            b_nuc = Decimal('1') + alpha * (nuc_mix_mg / (nuc_mix_mg + K_Nuc))
+        else:
+            b_nuc = Decimal('1')
+        
+        pui_raw = p_aa * b_nuc
+        pui = min(pui_raw, Decimal('1')) * Decimal('100')
+        
+        # Calculate AA:Nuc ratio for synergy dial
+        epsilon = Decimal('0.001')
+        aa_nuc_ratio = aa_mix_mg / max(nuc_mix_mg, epsilon)
+        
+        # Determine synergy zone
+        if aa_nuc_ratio < Decimal('0.6'):
+            synergy_zone = 'needs_aa'
+            synergy_suggestion = 'Add amino-rich ingredient (tomato, cheese, soy sauce).'
+        elif aa_nuc_ratio <= Decimal('1.6'):
+            synergy_zone = 'optimal'
+            synergy_suggestion = 'Optimal synergy ratio achieved.'
+        else:
+            synergy_zone = 'needs_nuc'
+            synergy_suggestion = 'Add nucleotide-rich ingredient (mushrooms, seafood, seaweed).'
+
         # Return values in mg/100g for frontend display
         total_aa = aa_mix_mg
         total_nuc = nuc_mix_mg
@@ -477,7 +514,11 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
                 'aa_g_per_100g': float(aa_g),
                 'nuc_g_per_100g': float(nuc_g),
                 'synergy_mg_per_100g': float(euc_mg)
-            }
+            },
+            'pui': float(pui),
+            'aa_nuc_ratio': float(aa_nuc_ratio),
+            'synergy_zone': synergy_zone,
+            'synergy_suggestion': synergy_suggestion
         }
 
         result_serializer = CompositionResultSerializer(result)
