@@ -5,8 +5,10 @@ import { Search, X, Edit3 } from 'lucide-react'
 import { FilterRow, SortSelect } from '@/components/SearchAndFilter'
 import { IngredientCard } from '@/components/IngredientCard'
 import { UmamiChart, TCMBars, MiniBars } from '@/components/Charts'
+import SynergyRatioDial from '@/components/SynergyRatioDial'
 import { Ingredient, FilterState, IngredientListResponse, CompositionState } from '@/types'
 import { searchIngredients, composePreview } from '@/lib/api'
+import { getUmamiLevel } from '@/lib/umamiLevels'
 
 interface StructuredSearchProps {
   onAddToComposition?: (ingredient: Ingredient) => void
@@ -227,6 +229,12 @@ export function StructuredSearch({
       }))
 
       const result = await composePreview(compositionData)
+      console.log('Composition result:', { 
+        pui: result.pui, 
+        aa_nuc_ratio: result.aa_nuc_ratio, 
+        synergy_zone: result.synergy_zone,
+        has_new_fields: !!(result.pui && result.aa_nuc_ratio)
+      })
       onChange({ ...composition, result })
     } catch (error) {
       console.error('Error updating composition:', error)
@@ -529,6 +537,57 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
               }}
               showIndividual={false}
             />
+            
+            {/* Umami Strength Display: Dual EUC/PUI */}
+            {(() => {
+              const totalAA = parseFloat(String(composition.result.total_aa))
+              const totalNuc = parseFloat(String(composition.result.total_nuc))
+              const totalSynergy = parseFloat(String(composition.result.total_synergy))
+              const totalUmami = totalAA + totalNuc + totalSynergy
+              const pui = composition.result.pui ?? 0
+              const level = getUmamiLevel(totalUmami)
+              
+              return (
+                <div className="paper-texture-light border border-gray-200 p-6">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4">Umami Strength</h4>
+                  <div className="space-y-4">
+                    {/* Dual display: Chemical and Perceived */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-600">Chemical (EUC)</span>
+                        <span className={`text-2xl font-light ${level.textColor}`}>
+                          {totalUmami.toFixed(1)} <span className="text-sm">mg/100g</span>
+                        </span>
+                        <span className={`text-xs ${level.textColor}`}>{level.name}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-600">Perceived (PUI)</span>
+                        <span className="text-2xl font-light text-fuchsia-700">
+                          {pui.toFixed(1)} <span className="text-sm">/ 100</span>
+                        </span>
+                        <span className="text-xs text-gray-600">Sensory intensity</span>
+                      </div>
+                    </div>
+                    {/* Suggestion */}
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {level.suggestion}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+            
+            {/* Synergy Ratio Dial */}
+            {composition.result.aa_nuc_ratio !== undefined && (
+              <SynergyRatioDial
+                ratio={composition.result.aa_nuc_ratio}
+                zone={composition.result.synergy_zone || 'optimal'}
+                suggestion={composition.result.synergy_suggestion || 'Calculating synergy...'}
+              />
+            )}
+            
             <TCMBars
               tcm={{
                 four_qi: aggregatedQi,
