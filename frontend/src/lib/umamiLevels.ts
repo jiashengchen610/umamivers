@@ -91,10 +91,11 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
 }
 
 /**
- * Convert g/100g to mg/100g
+ * Backend already stores values in mg/100g, so this is just a pass-through
+ * for backwards compatibility
  */
-export function gToMg(grams: number): number {
-  return grams * 1000
+export function gToMg(mgValue: number): number {
+  return mgValue
 }
 
 /**

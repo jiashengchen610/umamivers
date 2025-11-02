@@ -470,8 +470,8 @@ export function CompositionWorkbench({
             const totalAA = parseFloat(String(composition.result.total_aa))
             const totalNuc = parseFloat(String(composition.result.total_nuc))
             const totalSynergy = parseFloat(String(composition.result.total_synergy))
-            const totalUmamiMg = gToMg(totalAA + totalNuc + totalSynergy)
-            const level = getUmamiLevel(totalUmamiMg)
+            const totalUmami = totalAA + totalNuc + totalSynergy
+            const level = getUmamiLevel(totalUmami)
             
             return (
               <div className="paper-texture-light border border-gray-200 p-4">

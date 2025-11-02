@@ -249,14 +249,10 @@ interface UmamiChartProps {
 }
 
 export function UmamiChart({ chemistry, onAddClick, className = '', showIndividual = true }: UmamiChartProps) {
-  // Safely parse chemistry values and convert to mg/100g
-  const aaValueG = parseFloat(chemistry.umami_aa?.toString() || '0')
-  const nucValueG = parseFloat(chemistry.umami_nuc?.toString() || '0')
-  const synergyValueG = parseFloat(chemistry.umami_synergy?.toString() || '0')
-  
-  const aaValue = gToMg(aaValueG)
-  const nucValue = gToMg(nucValueG)
-  const synergyValue = gToMg(synergyValueG)
+  // Backend already stores values in mg/100g
+  const aaValue = parseFloat(chemistry.umami_aa?.toString() || '0')
+  const nucValue = parseFloat(chemistry.umami_nuc?.toString() || '0')
+  const synergyValue = parseFloat(chemistry.umami_synergy?.toString() || '0')
   const totalUmami = aaValue + nucValue + synergyValue
   
   const maxValue = Math.max(aaValue, nucValue, synergyValue, 1)
@@ -340,13 +336,10 @@ interface MiniBarsProps {
 }
 
 export function MiniBars({ chemistry, className = '' }: MiniBarsProps) {
-  const aaValueG = Number(chemistry.umami_aa || 0)
-  const nucValueG = Number(chemistry.umami_nuc || 0)
-  const synValueG = Number(chemistry.umami_synergy || 0)
-  
-  const aaValue = gToMg(aaValueG)
-  const nucValue = gToMg(nucValueG)
-  const synValue = gToMg(synValueG)
+  // Backend already stores values in mg/100g
+  const aaValue = Number(chemistry.umami_aa || 0)
+  const nucValue = Number(chemistry.umami_nuc || 0)
+  const synValue = Number(chemistry.umami_synergy || 0)
   const maxValue = Math.max(aaValue, nucValue, synValue, 1)
 
   const rows = [
