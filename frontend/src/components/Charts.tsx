@@ -331,12 +331,15 @@ interface MiniBarsProps {
 }
 
 export function MiniBars({ chemistry, className = '' }: MiniBarsProps) {
-  const maxValue = Math.max(chemistry.umami_aa, chemistry.umami_nuc, chemistry.umami_synergy, 1)
+  const aaValue = Number(chemistry.umami_aa || 0)
+  const nucValue = Number(chemistry.umami_nuc || 0)
+  const synValue = Number(chemistry.umami_synergy || 0)
+  const maxValue = Math.max(aaValue, nucValue, synValue, 1)
 
   const rows = [
-    { label: 'AA', value: chemistry.umami_aa, color: 'bg-umami-aa' },
-    { label: 'Nuc', value: chemistry.umami_nuc, color: 'bg-umami-nuc' },
-    { label: 'Syn', value: chemistry.umami_synergy, color: 'bg-umami-synergy' }
+    { label: 'AA', value: aaValue, color: 'bg-umami-aa' },
+    { label: 'Nuc', value: nucValue, color: 'bg-umami-nuc' },
+    { label: 'Syn', value: synValue, color: 'bg-umami-synergy' }
   ]
 
   return (
@@ -431,14 +434,14 @@ interface CompactVerticalBarsProps {
 
 export function CompactVerticalBars({ chemistry, className = '' }: CompactVerticalBarsProps) {
   const maxValue = Math.max(
-    parseFloat(chemistry.umami_aa || '0'), 
-    parseFloat(chemistry.umami_nuc || '0'), 
-    parseFloat(chemistry.umami_synergy || '0')
+    parseFloat(String(chemistry.umami_aa || '0')), 
+    parseFloat(String(chemistry.umami_nuc || '0')), 
+    parseFloat(String(chemistry.umami_synergy || '0'))
   )
   
-  const aaValue = parseFloat(chemistry.umami_aa || '0')
-  const nucValue = parseFloat(chemistry.umami_nuc || '0')
-  const synValue = parseFloat(chemistry.umami_synergy || '0')
+  const aaValue = parseFloat(String(chemistry.umami_aa || '0'))
+  const nucValue = parseFloat(String(chemistry.umami_nuc || '0'))
+  const synValue = parseFloat(String(chemistry.umami_synergy || '0'))
   
   return (
     <div className={`flex flex-col gap-0.5 items-center ${className}`}>
