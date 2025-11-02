@@ -85,8 +85,8 @@ export default function HowToUsePage() {
                 <span className="text-gray-600">Overlimit – exceeds normal range</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-black font-mono">2600+</span>
-                <span className="text-gray-600">Theoretical Max – receptor saturation</span>
+                <span className="text-red-600 font-mono">2600+</span>
+                <span className="text-gray-600">Theoretical Max – deep umami saturation</span>
               </div>
             </div>
           </div>

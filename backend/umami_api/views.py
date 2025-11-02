@@ -420,22 +420,26 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         gmp_g_per_100g = gmp_mg_per_100g / Decimal('1000')
         amp_g_per_100g = amp_mg_per_100g / Decimal('1000')
 
-        total_aa_g_per_100g = glu_g_per_100g + asp_g_per_100g
-        total_nuc_g_per_100g = imp_g_per_100g + gmp_g_per_100g + amp_g_per_100g
+        # Calculate weighted concentrations in mg/100g
+        aa_mix_mg = glu_mg_per_100g + asp_mg_per_100g
+        nuc_mix_mg = imp_mg_per_100g + gmp_mg_per_100g + amp_mg_per_100g
+        
+        # Convert to g/100g for EUC calculation
+        aa_g = aa_mix_mg / Decimal('1000')
+        nuc_g = nuc_mix_mg / Decimal('1000')
 
-        weighted_aa = glu_g_per_100g + (asp_g_per_100g * Decimal('0.077'))
-        weighted_nuc = imp_g_per_100g + (gmp_g_per_100g * Decimal('2.3')) + (amp_g_per_100g * Decimal('0.18'))
+        # Calculate EUC using simplified formula: EUC = 1219 × (AA_g × Nuc_g)
+        # Then convert back to mg MSG eq/100g
+        if nuc_g > 0:
+            euc_g = Decimal('1219') * aa_g * nuc_g
+            euc_mg = euc_g * Decimal('1000')
+        else:
+            euc_mg = Decimal('0')
 
-        # Calculate EUC (Equivalent Umami Concentration)
-        # EUC = Σ(aᵢ·bᵢ) + 1218 × (Σ(aᵢ·bᵢ)) × (Σ(aⱼ·bⱼ))
-        # where weighted_aa = Σ(aᵢ·bᵢ) and weighted_nuc = Σ(aⱼ·bⱼ)
-        synergy_component = Decimal('1218') * weighted_aa * weighted_nuc if weighted_nuc > 0 else Decimal('0')
-        total_euc = weighted_aa + weighted_nuc + synergy_component
-
-        # For backward compatibility, also calculate traditional values
-        total_aa = total_glu + total_asp
-        total_nuc = total_imp + total_gmp + total_amp
-        total_synergy = synergy_component
+        # Return values in mg/100g for frontend display
+        total_aa = aa_mix_mg
+        total_nuc = nuc_mix_mg
+        total_synergy = euc_mg
 
         # Prepare chart data
         chart_data = {
@@ -449,9 +453,9 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
                 'amp': float(amp_mg_per_100g)
             },
             'breakdown': {
-                'total_aa': float(total_aa_g_per_100g),
-                'total_nuc': float(total_nuc_g_per_100g),
-                'total_synergy': float(total_synergy)
+                'total_aa': float(aa_mix_mg),
+                'total_nuc': float(nuc_mix_mg),
+                'total_synergy': float(euc_mg)
             }
         }
 
@@ -468,11 +472,11 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
             'ingredients': ingredients_data,
             'chart_data': chart_data,
             'concentrations': {
-                'aa_mg_per_100g': float(glu_mg_per_100g + asp_mg_per_100g),
-                'nuc_mg_per_100g': float(imp_mg_per_100g + gmp_mg_per_100g + amp_mg_per_100g),
-                'aa_g_per_100g': float(total_aa_g_per_100g),
-                'nuc_g_per_100g': float(total_nuc_g_per_100g),
-                'synergy_g_per_100g': float(total_synergy)
+                'aa_mg_per_100g': float(aa_mix_mg),
+                'nuc_mg_per_100g': float(nuc_mix_mg),
+                'aa_g_per_100g': float(aa_g),
+                'nuc_g_per_100g': float(nuc_g),
+                'synergy_mg_per_100g': float(euc_mg)
             }
         }
 

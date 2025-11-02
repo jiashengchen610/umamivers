@@ -84,9 +84,9 @@ export function getUmamiLevel(mgPer100g: number): UmamiLevelInfo {
     level: 'theoretical-max',
     name: 'Theoretical Maximum',
     range: '2600-3300 mg/100g',
-    color: 'text-black',
-    textColor: 'text-black',
-    suggestion: 'Taste receptor saturation. Further increases provide no sensory benefit. Avoid additional concentration.'
+    color: 'text-red-600',
+    textColor: 'text-red-600',
+    suggestion: 'Deep umami saturation. Use dilution or add contrasting flavors for better harmony and complexity.'
   }
 }
 
