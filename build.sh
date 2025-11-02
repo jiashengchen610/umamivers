@@ -25,6 +25,9 @@ except Exception as e:
 echo "==> Loading fixtures..."
 python manage.py loaddata fixtures_ingredients.json
 
+echo "==> Initializing water ingredient..."
+python manage.py init_water || echo "Water ingredient initialization skipped"
+
 echo "==> Collecting static files..."
 python manage.py collectstatic --noinput
 
