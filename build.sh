@@ -2,27 +2,30 @@
 # exit on error
 set -o errexit
 
+echo "==> Installing dependencies..."
 cd backend
-
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Run migrations
+echo "==> Running migrations..."
 python manage.py migrate --noinput
 
-# Create PostgreSQL extensions (ignore errors if they exist)
-python manage.py shell << EOF
+echo "==> Creating PostgreSQL extensions..."
+python manage.py shell -c "
 from django.db import connection
-with connection.cursor() as cursor:
-    try:
-        cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
-        cursor.execute("CREATE EXTENSION IF NOT EXISTS unaccent;")
-    except Exception as e:
-        print(f"Extension creation: {e}")
-EOF
+try:
+    with connection.cursor() as cursor:
+        cursor.execute('CREATE EXTENSION IF NOT EXISTS pg_trgm;')
+        cursor.execute('CREATE EXTENSION IF NOT EXISTS unaccent;')
+    print('Extensions created successfully')
+except Exception as e:
+    print(f'Extension warning (may already exist): {e}')
+" || echo "Extensions may already exist, continuing..."
 
-# Load fixtures
+echo "==> Loading fixtures..."
 python manage.py loaddata fixtures_ingredients.json
 
-# Collect static files
+echo "==> Collecting static files..."
 python manage.py collectstatic --noinput
+
+echo "==> Build complete!"
