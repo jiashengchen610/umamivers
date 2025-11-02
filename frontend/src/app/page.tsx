@@ -76,14 +76,14 @@ export default function HomePage() {
           {/* 1. Title */}
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
-              Umami Composition Builder
+              Umami Builder
             </h1>
           </div>
 
           {/* 2. Subtitle */}
           <div className="text-center max-w-2xl mx-auto">
             <p className="text-base sm:text-lg text-gray-600">
-              Build umami-first ingredient blends while tracking the balance of amino acids, nucleotides, and TCM energy.
+              Search and pair umami across different foods.
             </p>
           </div>
 

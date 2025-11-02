@@ -224,41 +224,6 @@ const umamiOptions = [
     { value: 'Heart', label: 'Heart' }
   ]
 
-  const allergenOptions = [
-    { value: 'fish', label: 'Fish' },
-    { value: 'gluten', label: 'Gluten' },
-    { value: 'dairy', label: 'Dairy' },
-    { value: 'nuts', label: 'Nuts' },
-    { value: 'soy', label: 'Soy' },
-    { value: 'shellfish', label: 'Shellfish' },
-    { value: 'eggs', label: 'Eggs' },
-    { value: 'sesame', label: 'Sesame' },
-    { value: 'sulfites', label: 'Sulfites' },
-    { value: 'celery', label: 'Celery' },
-    { value: 'mustard', label: 'Mustard' },
-    { value: 'lupin', label: 'Lupin' },
-    { value: 'molluscs', label: 'Molluscs' },
-    { value: 'crustaceans', label: 'Crustaceans' }
-  ]
-
-  const dietaryOptions = [
-    { value: 'vegan', label: 'Vegan' },
-    { value: 'vegetarian', label: 'Vegetarian' },
-    { value: 'pescatarian', label: 'Pescatarian' },
-    { value: 'gluten_free', label: 'Gluten-Free' },
-    { value: 'dairy_free', label: 'Dairy-Free' },
-    { value: 'nut_free', label: 'Nut-Free' },
-    { value: 'soy_free', label: 'Soy-Free' },
-    { value: 'egg_free', label: 'Egg-Free' },
-    { value: 'shellfish_free', label: 'Shellfish-Free' },
-    { value: 'kosher', label: 'Kosher' },
-    { value: 'halal', label: 'Halal' },
-    { value: 'organic', label: 'Organic' },
-    { value: 'raw', label: 'Raw' },
-    { value: 'paleo', label: 'Paleo' },
-    { value: 'keto', label: 'Keto' }
-  ]
-
   const sortOptions = SORT_OPTIONS
 
   // Get all active filter chips
@@ -321,6 +286,20 @@ const umamiOptions = [
       }
     })
     
+    // Meridian filters
+    filters.meridians.forEach(value => {
+      const option = meridianOptions.find(opt => opt.value === value)
+      if (option) {
+        chips.push({
+          label: `Meridian: ${option.label}`,
+          onRemove: () => onChange({
+            ...filters,
+            meridians: filters.meridians.filter(v => v !== value)
+          })
+        })
+      }
+    })
+    
     return chips
   }
 
@@ -363,20 +342,6 @@ const umamiOptions = [
           options={meridianOptions}
           selectedValues={filters.meridians}
           onChange={(values) => onChange({ ...filters, meridians: values })}
-        />
-        
-        <FilterDropdown
-          title="Exclude Allergens"
-          options={allergenOptions}
-          selectedValues={filters.allergens_exclude}
-          onChange={(values) => onChange({ ...filters, allergens_exclude: values })}
-        />
-        
-        <FilterDropdown
-          title="Dietary"
-          options={dietaryOptions}
-          selectedValues={filters.dietary}
-          onChange={(values) => onChange({ ...filters, dietary: values })}
         />
       </div>
       

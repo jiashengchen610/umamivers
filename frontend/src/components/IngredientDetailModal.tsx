@@ -146,32 +146,11 @@ export function IngredientDetailModal({
                       </div>
 
                       <div className="grid gap-4 sm:grid-cols-2 text-sm text-gray-700">
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium uppercase text-gray-500">Allergens</div>
-                          <p className="leading-relaxed">
-                            {formattedAllergens.length ? formattedAllergens.join(', ') : 'None reported'}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium uppercase text-gray-500">Religious suitability</div>
-                          <p className="leading-relaxed">
-                            {dietarySplit.religious.length ? dietarySplit.religious.join(', ') : 'Not specified'}
-                          </p>
-                        </div>
                         {(tcmFlavors.length > 0 || tcmQi.length > 0) && (
                           <div className="space-y-1">
                             <div className="text-xs font-medium uppercase text-gray-500">TCM focus</div>
                             <p className="leading-relaxed">
                               {[tcmFlavors.slice(0, 3).join(', '), tcmQi.join(', ')].filter(Boolean).join(' • ') || 'Balanced profile'}
-                            </p>
-                          </div>
-                        )}
-                        {dietarySplit.other.length > 0 && (
-                          <div className="space-y-1">
-                            <div className="text-xs font-medium uppercase text-gray-500">Additional dietary</div>
-                            <p className="leading-relaxed">
-                              {dietarySplit.other.slice(0, 3).join(', ')}
-                              {dietarySplit.other.length > 3 ? ` +${dietarySplit.other.length - 3}` : ''}
                             </p>
                           </div>
                         )}
@@ -214,24 +193,6 @@ export function IngredientDetailModal({
                         <TCMBars tcm={ingredient.tcm} />
                       </div>
                     )}
-                  </div>
-
-                  <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Dietary Details</h3>
-                    <div className="grid gap-4 sm:grid-cols-2 text-sm text-gray-700">
-                      <div>
-                        <div className="text-xs font-medium uppercase text-gray-500">Religious suitability</div>
-                        <p className="mt-1 leading-relaxed">
-                          {dietarySplit.religious.length ? dietarySplit.religious.join(', ') : 'No specific religious tags recorded.'}
-                        </p>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium uppercase text-gray-500">Other dietary notes</div>
-                        <p className="mt-1 leading-relaxed">
-                          {dietarySplit.other.length ? dietarySplit.other.join(', ') : 'No additional dietary restrictions recorded.'}
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
                   {(tcmMeridians.length > 0 || ingredient.similar?.length || ingredient.complementary?.length) && (

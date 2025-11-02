@@ -427,12 +427,15 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         weighted_nuc = imp_g_per_100g + (gmp_g_per_100g * Decimal('2.3')) + (amp_g_per_100g * Decimal('0.18'))
 
         # Calculate EUC (Equivalent Umami Concentration)
-        total_euc = weighted_aa + (Decimal('1218') * weighted_aa * weighted_nuc if weighted_nuc > 0 else Decimal('0'))
+        # EUC = Σ(aᵢ·bᵢ) + 1218 × (Σ(aᵢ·bᵢ)) × (Σ(aⱼ·bⱼ))
+        # where weighted_aa = Σ(aᵢ·bᵢ) and weighted_nuc = Σ(aⱼ·bⱼ)
+        synergy_component = Decimal('1218') * weighted_aa * weighted_nuc if weighted_nuc > 0 else Decimal('0')
+        total_euc = weighted_aa + weighted_nuc + synergy_component
 
         # For backward compatibility, also calculate traditional values
         total_aa = total_glu + total_asp
         total_nuc = total_imp + total_gmp + total_amp
-        total_synergy = total_euc
+        total_synergy = synergy_component
 
         # Prepare chart data
         chart_data = {

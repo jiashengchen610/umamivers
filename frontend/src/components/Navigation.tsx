@@ -12,16 +12,26 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="text-xl font-bold text-gray-900 hover:text-gray-700 transition-colors">
-              Umamivers
+              Umami Builder
             </Link>
           </div>
           
           <div className="flex items-center space-x-6">
             <Link 
+              href="/" 
+              className={`text-sm transition-colors ${
+                pathname === '/' 
+                  ? 'text-black font-medium' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Search
+            </Link>
+            <Link 
               href="/how-to-use" 
               className={`text-sm transition-colors ${
                 pathname === '/how-to-use' 
-                  ? 'text-blue-600 font-medium' 
+                  ? 'text-black font-medium' 
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >

@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent,
 import { Ingredient, CompositionState } from '@/types'
 import { TCMBars, UmamiChart, MiniBars } from '@/components/Charts'
 import { SearchBar } from '@/components/SearchAndFilter'
-import { X, Download, Share2, Save } from 'lucide-react'
-import { composePreview } from '@/lib/api'
+import { X, Download, Share2, Save, Droplet } from 'lucide-react'
+import { composePreview, searchIngredients } from '@/lib/api'
 
 interface CompositionWorkbenchProps {
   composition: CompositionState
@@ -47,6 +47,8 @@ export function CompositionWorkbench({
   className = '' 
 }: CompositionWorkbenchProps) {
   const [isUpdating, setIsUpdating] = useState(false)
+  const [localQuantities, setLocalQuantities] = useState<Record<number, string>>({})
+  const [waterIngredient, setWaterIngredient] = useState<Ingredient | null>(null)
 
   const resultQuantityMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -127,6 +129,24 @@ export function CompositionWorkbench({
     }
   }, [composition.ingredients, resultQuantityMap])
 
+  // Fetch water ingredient on mount
+  useEffect(() => {
+    const fetchWater = async () => {
+      try {
+        const response = await searchIngredients({ query: 'water' })
+        const water = response.results.find(ing => 
+          ing.base_name.toLowerCase() === 'water' || ing.display_name.toLowerCase() === 'water'
+        )
+        if (water) {
+          setWaterIngredient(water)
+        }
+      } catch (error) {
+        console.error('Error fetching water ingredient:', error)
+      }
+    }
+    fetchWater()
+  }, [])
+
   // Update composition when ingredients or quantities change
   useEffect(() => {
     updateComposition()
@@ -169,6 +189,27 @@ export function CompositionWorkbench({
         : item
     )
     onChange({ ...composition, ingredients: newIngredients })
+  }
+
+  const handleQuantityFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    event.target.select()
+  }
+
+  const handleQuantityChange = (ingredientId: number, value: string) => {
+    setLocalQuantities(prev => ({ ...prev, [ingredientId]: value }))
+  }
+
+  const handleQuantityBlur = (ingredientId: number) => {
+    const value = localQuantities[ingredientId]
+    if (value !== undefined) {
+      const numValue = parseFloat(value) || 0
+      updateQuantity(ingredientId, numValue)
+      setLocalQuantities(prev => {
+        const newState = { ...prev }
+        delete newState[ingredientId]
+        return newState
+      })
+    }
   }
 
   const updateUnit = (ingredientId: number, unit: string) => {
@@ -253,6 +294,14 @@ export function CompositionWorkbench({
     alert('Share URL copied to clipboard!')
   }
 
+  const handleAddWater = () => {
+    if (!waterIngredient) {
+      alert('Water ingredient not found in database. Please ensure it exists.')
+      return
+    }
+    addIngredient(waterIngredient)
+  }
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
@@ -302,7 +351,18 @@ export function CompositionWorkbench({
 
           {/* Selected Ingredients */}
           <div className="space-y-3">
-            <h3 className="text-lg font-medium">Selected Ingredients</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Selected Ingredients</h3>
+              {composition.ingredients.length > 0 && waterIngredient && (
+                <button
+                  onClick={handleAddWater}
+                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  <Droplet className="w-4 h-4" />
+                  Dilute with water
+                </button>
+              )}
+            </div>
             {composition.ingredients.length === 0 ? (
               <p className="text-gray-500 text-sm">No ingredients selected yet.</p>
             ) : (
@@ -341,8 +401,10 @@ export function CompositionWorkbench({
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateQuantity(item.ingredient.id, parseFloat(e.target.value) || 0)}
+                          value={localQuantities[item.ingredient.id] ?? item.quantity}
+                          onChange={(e) => handleQuantityChange(item.ingredient.id, e.target.value)}
+                          onFocus={handleQuantityFocus}
+                          onBlur={() => handleQuantityBlur(item.ingredient.id)}
                           className="w-20 px-2 py-1 border border-gray-300 text-sm"
                           min="0"
                           step="0.1"
@@ -365,21 +427,6 @@ export function CompositionWorkbench({
                       {item.ingredient.chemistry && (
                         <MiniBars chemistry={item.ingredient.chemistry} />
                       )}
-
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <div>
-                          <span className="font-medium">Allergens:</span>{' '}
-                          {item.ingredient.flags?.allergens?.length
-                            ? item.ingredient.flags.allergens.join(', ')
-                            : 'None reported'}
-                        </div>
-                        {(item.ingredient.flags?.dietary_restrictions?.length ?? 0) > 0 && (
-                          <div>
-                            <span className="font-medium">Dietary:</span>{' '}
-                            {item.ingredient.flags?.dietary_restrictions?.slice(0, 4).join(', ')}
-                          </div>
-                        )}
-                      </div>
                     </div>
                   ))}
                 </div>
