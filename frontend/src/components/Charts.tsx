@@ -108,7 +108,7 @@ export function TCMBars({ tcm, distributions, onQiAddClick, onFlavorAddClick, on
 
     const total = entries.reduce((sum, [, value]) => sum + Number(value), 0) || 1
     const sorted = entries
-      .map(([label, value]) => ({ label, value: Number(value) }))
+      .map(([label, value]) => ({ label: String(label), value: Number(value) }))
       .sort((a, b) => b.value - a.value)
 
     let remainder = 100
