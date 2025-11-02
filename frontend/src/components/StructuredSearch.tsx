@@ -461,7 +461,7 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
         {composition.ingredients.length > 0 && (
           <button
             onClick={handleClearComposition}
-            className="px-3 py-2 text-sm text-red-500 hover:text-red-600"
+            className="px-3 py-2 text-sm text-black hover:text-gray-700"
           >
             Clear all
           </button>

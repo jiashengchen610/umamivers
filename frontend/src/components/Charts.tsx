@@ -2,6 +2,7 @@
 
 import { Chemistry, TCM } from '@/types'
 import { Plus } from 'lucide-react'
+import { gToMg, formatUmamiMg, getUmamiColor, getUmamiLevel } from '@/lib/umamiLevels'
 
 interface CategoricalBarProps {
   title: string
@@ -248,10 +249,16 @@ interface UmamiChartProps {
 }
 
 export function UmamiChart({ chemistry, onAddClick, className = '', showIndividual = true }: UmamiChartProps) {
-  // Safely parse chemistry values
-  const aaValue = parseFloat(chemistry.umami_aa?.toString() || '0')
-  const nucValue = parseFloat(chemistry.umami_nuc?.toString() || '0')
-  const synergyValue = parseFloat(chemistry.umami_synergy?.toString() || '0')
+  // Safely parse chemistry values and convert to mg/100g
+  const aaValueG = parseFloat(chemistry.umami_aa?.toString() || '0')
+  const nucValueG = parseFloat(chemistry.umami_nuc?.toString() || '0')
+  const synergyValueG = parseFloat(chemistry.umami_synergy?.toString() || '0')
+  
+  const aaValue = gToMg(aaValueG)
+  const nucValue = gToMg(nucValueG)
+  const synergyValue = gToMg(synergyValueG)
+  const totalUmami = aaValue + nucValue + synergyValue
+  
   const maxValue = Math.max(aaValue, nucValue, synergyValue, 1)
 
   const isEnhanced = (() => {
@@ -261,13 +268,15 @@ export function UmamiChart({ chemistry, onAddClick, className = '', showIndividu
   })()
 
   const synergyLabel = isEnhanced ? 'Enhanced' : 'Baseline'
+  const umamiLevel = getUmamiLevel(totalUmami)
+  const umamiColor = getUmamiColor(totalUmami)
   
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <div>
           <h3 className="text-sm font-medium text-gray-700">Umami Profile</h3>
-          <p className="text-xs text-gray-500">AA + Nuc = Exponential Synergy (up to 8x enhancement)</p>
+          <p className="text-xs text-gray-500">Total: <span className={umamiColor}>{formatUmamiMg(totalUmami)} mg/100g</span> · {umamiLevel.name}</p>
         </div>
         {onAddClick && (
           <button
@@ -299,9 +308,9 @@ export function UmamiChart({ chemistry, onAddClick, className = '', showIndividu
           text: synergyLabel,
           emphasis: true
         }].map(row => (
-          <div key={row.label} className="grid grid-cols-[90px_48px_minmax(0,1fr)] items-center gap-2">
+          <div key={row.label} className="grid grid-cols-[90px_60px_minmax(0,1fr)] items-center gap-2">
             <span className="text-xs text-gray-600">{row.label}</span>
-            <span className="text-xs text-gray-500 text-right">{row.value.toFixed(1)}</span>
+            <span className="text-xs text-gray-500 text-right">{formatUmamiMg(row.value)} mg</span>
             <div className="h-6 bg-gray-200 rounded overflow-hidden">
               <div
                 className={`h-full transition-all duration-300 px-2 flex items-center ${row.color}`}
@@ -331,22 +340,27 @@ interface MiniBarsProps {
 }
 
 export function MiniBars({ chemistry, className = '' }: MiniBarsProps) {
-  const aaValue = Number(chemistry.umami_aa || 0)
-  const nucValue = Number(chemistry.umami_nuc || 0)
-  const synValue = Number(chemistry.umami_synergy || 0)
+  const aaValueG = Number(chemistry.umami_aa || 0)
+  const nucValueG = Number(chemistry.umami_nuc || 0)
+  const synValueG = Number(chemistry.umami_synergy || 0)
+  
+  const aaValue = gToMg(aaValueG)
+  const nucValue = gToMg(nucValueG)
+  const synValue = gToMg(synValueG)
   const maxValue = Math.max(aaValue, nucValue, synValue, 1)
 
   const rows = [
-    { label: 'AA', value: aaValue, color: 'bg-umami-aa' },
-    { label: 'Nuc', value: nucValue, color: 'bg-umami-nuc' },
-    { label: 'Syn', value: synValue, color: 'bg-umami-synergy' }
+    { label: 'AA', value: aaValue, displayValue: formatUmamiMg(aaValue), color: 'bg-umami-aa' },
+    { label: 'Nuc', value: nucValue, displayValue: formatUmamiMg(nucValue), color: 'bg-umami-nuc' },
+    { label: 'Syn', value: synValue, displayValue: formatUmamiMg(synValue), color: 'bg-umami-synergy' }
   ]
 
   return (
     <div className={`space-y-1 ${className}`}>
       {rows.map(row => (
-        <div key={row.label} className="grid grid-cols-[32px_minmax(0,1fr)] items-center gap-1 text-xs text-gray-500">
+        <div key={row.label} className="grid grid-cols-[32px_40px_minmax(0,1fr)] items-center gap-1 text-xs text-gray-500">
           <span className="text-right">{row.label}</span>
+          <span className="text-right text-[10px]">{row.displayValue}</span>
           <div className="h-2 bg-gray-200 rounded overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${row.color}`}

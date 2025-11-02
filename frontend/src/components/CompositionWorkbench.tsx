@@ -6,6 +6,7 @@ import { TCMBars, UmamiChart, MiniBars } from '@/components/Charts'
 import { SearchBar } from '@/components/SearchAndFilter'
 import { X, Download, Share2, Save, Droplet } from 'lucide-react'
 import { composePreview, searchIngredients } from '@/lib/api'
+import { getUmamiLevel, gToMg } from '@/lib/umamiLevels'
 
 interface CompositionWorkbenchProps {
   composition: CompositionState
@@ -463,6 +464,31 @@ export function CompositionWorkbench({
               onAddClick={() => onSearchIngredients?.('')}
             />
           </div>
+
+          {/* Umami Level Indicator */}
+          {composition.result && composition.ingredients.length > 0 && (() => {
+            const totalAA = parseFloat(String(composition.result.total_aa))
+            const totalNuc = parseFloat(String(composition.result.total_nuc))
+            const totalSynergy = parseFloat(String(composition.result.total_synergy))
+            const totalUmamiMg = gToMg(totalAA + totalNuc + totalSynergy)
+            const level = getUmamiLevel(totalUmamiMg)
+            
+            return (
+              <div className="paper-texture-light border border-gray-200 p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-gray-700">Flavor Balance</h4>
+                    <span className={`text-sm font-medium ${level.textColor}`}>
+                      {level.name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    {level.suggestion}
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* TCM Combined Analysis - placeholder for now */}
           {composition.result && composition.ingredients.length > 0 && (

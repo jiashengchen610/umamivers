@@ -360,7 +360,7 @@ const umamiOptions = [
           {onClearFilters && (
             <button
               onClick={onClearFilters}
-              className="px-2 py-1 text-xs text-red-500 hover:text-red-600"
+              className="px-2 py-1 text-xs text-black hover:text-gray-700"
             >
               Clear filters
             </button>
