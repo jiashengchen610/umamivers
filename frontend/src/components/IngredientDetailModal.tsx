@@ -170,7 +170,7 @@ export function IngredientDetailModal({
                           className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white text-sm font-medium py-2 hover:bg-gray-800 transition-colors"
                         >
                           <Plus className="w-4 h-4" />
-                          <span>+ Add to combo</span>
+                          <span>Add to combo</span>
                         </button>
                       )}
                       <div className="pt-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">

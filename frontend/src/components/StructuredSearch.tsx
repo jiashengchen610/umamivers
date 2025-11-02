@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { Search, X, Edit3 } from 'lucide-react'
+import { Search, X, Edit3, Droplet } from 'lucide-react'
 import { FilterRow, SortSelect } from '@/components/SearchAndFilter'
 import { IngredientCard } from '@/components/IngredientCard'
 import { UmamiChart, TCMBars, MiniBars } from '@/components/Charts'
@@ -78,6 +78,7 @@ export function StructuredSearch({
   const [isUpdating, setIsUpdating] = useState(false)
   const [totalIngredientCount, setTotalIngredientCount] = useState<number | null>(null)
   const [localQuantities, setLocalQuantities] = useState<Record<number, string>>({})
+  const [waterIngredient, setWaterIngredient] = useState<Ingredient | null>(null)
 
   const resultQuantityMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -169,6 +170,24 @@ export function StructuredSearch({
                           filters.category.length > 0
 
   const shouldShowResults = hasActiveQuery || hasActiveFilters
+
+  // Fetch water ingredient on mount
+  useEffect(() => {
+    const fetchWater = async () => {
+      try {
+        const response = await searchIngredients({ ...initialFilters, query: 'water' }, 1, 1)
+        const water = response.results.find(ing => 
+          ing.base_name.toLowerCase() === 'water' || ing.display_name?.toLowerCase() === 'water'
+        )
+        if (water) {
+          setWaterIngredient(water)
+        }
+      } catch (error) {
+        console.error('Error fetching water ingredient:', error)
+      }
+    }
+    fetchWater()
+  }, [])
 
   useEffect(() => {
     const fetchTotalCount = async () => {
@@ -383,6 +402,16 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
   onOpenDetails(ingredient)
 }
 
+const handleAddWater = () => {
+  if (!waterIngredient) {
+    alert('Water ingredient not found in database. Please ensure it exists.')
+    return
+  }
+  if (onAddToComposition) {
+    onAddToComposition(waterIngredient)
+  }
+}
+
   const handleTitleSave = () => {
     setIsEditingTitle(false)
     setUserEditedTitle(comboTitle.trim().length > 0)
@@ -493,6 +522,15 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
             </button>
             <h2 className="text-xl font-semibold text-gray-900 flex-1">{comboTitle}</h2>
           </>
+        )}
+        {composition.ingredients.length > 0 && waterIngredient && (
+          <button
+            onClick={handleAddWater}
+            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <Droplet className="w-4 h-4" />
+            Dilute with water
+          </button>
         )}
         {composition.ingredients.length > 0 && (
           <button
