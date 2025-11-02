@@ -57,7 +57,7 @@ export default function HowToUsePage() {
               The fifth basic taste—savory, satisfying, and deeply flavorful. Triggered by glutamate (amino acids) and enhanced by nucleotides (IMP, GMP, AMP).
             </p>
             <p className="text-xs sm:text-sm text-gray-600">
-              When combined, these create <strong>synergy</strong>—up to 8x umami enhancement. That's why mushrooms + tomatoes = magic.
+              When combined, these create <strong>synergy</strong>—up to 8x umami enhancement. That&apos;s why mushrooms + tomatoes = magic.
             </p>
           </div>
 
@@ -65,7 +65,7 @@ export default function HowToUsePage() {
             <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3">Umami Levels (mg/100g)</h3>
             <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex items-start gap-2">
-                <span className="text-gray-500 font-mono">< 10</span>
+                <span className="text-gray-500 font-mono">&lt; 10</span>
                 <span className="text-gray-600">Sub-threshold – barely perceptible</span>
               </div>
               <div className="flex items-start gap-2">
