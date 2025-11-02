@@ -440,23 +440,21 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         # P_AA = 1 / (1 + (K_AA / AA_mix_mg)^n)  where K_AA=80, n=1.4
         # B_Nuc = 1 + α * (Nuc_mix_mg / (Nuc_mix_mg + K_Nuc))  where α=1.5, K_Nuc=30
         # PUI = min(P_AA * B_Nuc, 1) * 100
-        K_AA = Decimal('80')
-        n = Decimal('1.4')
-        alpha = Decimal('1.5')
-        K_Nuc = Decimal('30')
+        # Using float for pow operation for better compatibility
         
         if aa_mix_mg > 0:
-            p_aa = Decimal('1') / (Decimal('1') + pow(K_AA / aa_mix_mg, n))
+            ratio = float(Decimal('80') / aa_mix_mg)
+            p_aa = Decimal(str(1.0 / (1.0 + pow(ratio, 1.4))))
         else:
             p_aa = Decimal('0')
         
         if nuc_mix_mg > 0:
-            b_nuc = Decimal('1') + alpha * (nuc_mix_mg / (nuc_mix_mg + K_Nuc))
+            b_nuc = Decimal('1') + Decimal('1.5') * (nuc_mix_mg / (nuc_mix_mg + Decimal('30')))
         else:
             b_nuc = Decimal('1')
         
         pui_raw = p_aa * b_nuc
-        pui = min(pui_raw, Decimal('1')) * Decimal('100')
+        pui = min(float(pui_raw), 1.0) * 100
         
         # Calculate AA:Nuc ratio for synergy dial
         epsilon = Decimal('0.001')
