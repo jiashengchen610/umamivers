@@ -612,10 +612,10 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
                       <span className="font-medium">TCM:</span>{' '}
                       {(item.ingredient.tcm?.five_flavors || ['Sweet']).map(normalizeFlavorLabel).join(', ')} • {(item.ingredient.tcm?.four_qi || ['Neutral']).join(', ')}
                     </div>
-                    {item.ingredient.flags?.dietary_restrictions?.length > 0 && (
+                    {(item.ingredient.flags?.dietary_restrictions?.length ?? 0) > 0 && (
                       <div>
                         <span className="font-medium">Dietary:</span>{' '}
-                        {item.ingredient.flags.dietary_restrictions.slice(0, 4).join(', ')}
+                        {item.ingredient.flags?.dietary_restrictions?.slice(0, 4).join(', ')}
                       </div>
                     )}
                   </div>
