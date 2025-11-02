@@ -342,6 +342,12 @@ const removeIngredient = (ingredientId: number) => {
     }
   }
 
+  const handleQuantityKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, ingredientId: number) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur()
+    }
+  }
+
 const updateUnit = (ingredientId: number, unit: string) => {
   const newIngredients = composition.ingredients.map(item =>
     item.ingredient.id === ingredientId
@@ -604,6 +610,7 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
                       onChange={(e) => handleQuantityChange(item.ingredient.id, e.target.value)}
                       onFocus={handleQuantityFocus}
                       onBlur={() => handleQuantityBlur(item.ingredient.id)}
+                      onKeyDown={(e) => handleQuantityKeyDown(e, item.ingredient.id)}
                       className="w-20 px-2 py-1 border border-gray-300 text-sm"
                       min="0"
                       step="0.1"
