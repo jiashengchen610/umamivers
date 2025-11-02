@@ -6,7 +6,9 @@ import {
   FilterState 
 } from '@/types'
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8000/api' : '/api'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+  : (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8000/api' : '/api')
 
 export class APIError extends Error {
   constructor(message: string, public status?: number) {

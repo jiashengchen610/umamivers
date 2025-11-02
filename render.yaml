@@ -1,0 +1,45 @@
+services:
+  # Django Backend
+  - type: web
+    name: umamivers-backend
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn umami_project.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: umamivers-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        sync: false
+    healthCheckPath: /api/ingredients/
+
+  # Next.js Frontend
+  - type: web
+    name: umamivers-frontend
+    runtime: node
+    plan: free
+    buildCommand: "cd frontend && npm install && npm run build"
+    startCommand: "cd frontend && npm start"
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: umamivers-backend
+          envVarKey: RENDER_EXTERNAL_URL
+
+# PostgreSQL Database
+databases:
+  - name: umamivers-db
+    plan: free
+    databaseName: umami_db
+    user: umami_user
