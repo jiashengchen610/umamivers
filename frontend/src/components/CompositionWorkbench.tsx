@@ -135,7 +135,7 @@ export function CompositionWorkbench({
       try {
         const response = await searchIngredients({ query: 'water' })
         const water = response.results.find(ing => 
-          ing.base_name.toLowerCase() === 'water' || ing.display_name.toLowerCase() === 'water'
+          ing.base_name.toLowerCase() === 'water' || ing.display_name?.toLowerCase() === 'water'
         )
         if (water) {
           setWaterIngredient(water)
