@@ -490,14 +490,14 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
           <>
             <UmamiChart
               chemistry={{
-                glu: parseFloat(composition.result.total_glu),
-                asp: parseFloat(composition.result.total_asp),
-                imp: parseFloat(composition.result.total_imp),
-                gmp: parseFloat(composition.result.total_gmp),
-                amp: parseFloat(composition.result.total_amp),
-                umami_aa: parseFloat(composition.result.total_aa),
-                umami_nuc: parseFloat(composition.result.total_nuc),
-                umami_synergy: parseFloat(composition.result.total_synergy)
+                glu: parseFloat(String(composition.result.total_glu)),
+                asp: parseFloat(String(composition.result.total_asp)),
+                imp: parseFloat(String(composition.result.total_imp)),
+                gmp: parseFloat(String(composition.result.total_gmp)),
+                amp: parseFloat(String(composition.result.total_amp)),
+                umami_aa: parseFloat(String(composition.result.total_aa)),
+                umami_nuc: parseFloat(String(composition.result.total_nuc)),
+                umami_synergy: parseFloat(String(composition.result.total_synergy))
               }}
               showIndividual={false}
             />
