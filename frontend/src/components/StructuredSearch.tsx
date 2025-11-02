@@ -75,6 +75,7 @@ export function StructuredSearch({
   const [userEditedTitle, setUserEditedTitle] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [totalIngredientCount, setTotalIngredientCount] = useState<number | null>(null)
+  const [localQuantities, setLocalQuantities] = useState<Record<number, string>>({})
 
   const resultQuantityMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -311,14 +312,35 @@ const removeIngredient = (ingredientId: number) => {
   onChange({ ...composition, ingredients: newIngredients })
 }
 
-const updateQuantity = (ingredientId: number, quantity: number) => {
-  const newIngredients = composition.ingredients.map(item =>
-    item.ingredient.id === ingredientId
-      ? { ...item, quantity }
-      : item
-  )
-  onChange({ ...composition, ingredients: newIngredients })
-}
+  const updateQuantity = (ingredientId: number, quantity: number) => {
+    const newIngredients = composition.ingredients.map(item =>
+      item.ingredient.id === ingredientId
+        ? { ...item, quantity }
+        : item
+    )
+    onChange({ ...composition, ingredients: newIngredients })
+  }
+
+  const handleQuantityFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    event.target.select()
+  }
+
+  const handleQuantityChange = (ingredientId: number, value: string) => {
+    setLocalQuantities(prev => ({ ...prev, [ingredientId]: value }))
+  }
+
+  const handleQuantityBlur = (ingredientId: number) => {
+    const value = localQuantities[ingredientId]
+    if (value !== undefined) {
+      const numValue = parseFloat(value) || 0
+      updateQuantity(ingredientId, numValue)
+      setLocalQuantities(prev => {
+        const newState = { ...prev }
+        delete newState[ingredientId]
+        return newState
+      })
+    }
+  }
 
 const updateUnit = (ingredientId: number, unit: string) => {
   const newIngredients = composition.ingredients.map(item =>
@@ -578,8 +600,10 @@ const handleComboCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, ingre
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateQuantity(item.ingredient.id, parseFloat(e.target.value) || 0)}
+                      value={localQuantities[item.ingredient.id] ?? item.quantity}
+                      onChange={(e) => handleQuantityChange(item.ingredient.id, e.target.value)}
+                      onFocus={handleQuantityFocus}
+                      onBlur={() => handleQuantityBlur(item.ingredient.id)}
                       className="w-20 px-2 py-1 border border-gray-300 text-sm"
                       min="0"
                       step="0.1"
