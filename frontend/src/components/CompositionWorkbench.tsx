@@ -394,14 +394,14 @@ export function CompositionWorkbench({
           <div className="paper-texture-light border border-gray-200 p-6">
             <UmamiChart
               chemistry={composition.result ? {
-                glu: parseFloat(composition.result.total_glu),
-                asp: parseFloat(composition.result.total_asp),
-                imp: parseFloat(composition.result.total_imp),
-                gmp: parseFloat(composition.result.total_gmp),
-                amp: parseFloat(composition.result.total_amp),
-                umami_aa: parseFloat(composition.result.total_aa),
-                umami_nuc: parseFloat(composition.result.total_nuc),
-                umami_synergy: parseFloat(composition.result.total_synergy)
+                glu: parseFloat(String(composition.result.total_glu)),
+                asp: parseFloat(String(composition.result.total_asp)),
+                imp: parseFloat(String(composition.result.total_imp)),
+                gmp: parseFloat(String(composition.result.total_gmp)),
+                amp: parseFloat(String(composition.result.total_amp)),
+                umami_aa: parseFloat(String(composition.result.total_aa)),
+                umami_nuc: parseFloat(String(composition.result.total_nuc)),
+                umami_synergy: parseFloat(String(composition.result.total_synergy))
               } : {
                 glu: 0,
                 asp: 0,
@@ -446,12 +446,12 @@ export function CompositionWorkbench({
             <div className="bg-gray-50 border border-gray-200 p-4">
               <h4 className="font-medium mb-2">Composition Summary</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Total Glu: {parseFloat(composition.result.total_glu).toFixed(1)}</div>
-                <div>Total Asp: {parseFloat(composition.result.total_asp).toFixed(1)}</div>
-                <div>Total IMP: {parseFloat(composition.result.total_imp).toFixed(1)}</div>
-                <div>Total GMP: {parseFloat(composition.result.total_gmp).toFixed(1)}</div>
-                <div>Total AMP: {parseFloat(composition.result.total_amp).toFixed(1)}</div>
-                <div className="font-medium">Synergy: {parseFloat(composition.result.total_synergy).toFixed(1)}</div>
+                <div>Total Glu: {parseFloat(String(composition.result.total_glu)).toFixed(1)}</div>
+                <div>Total Asp: {parseFloat(String(composition.result.total_asp)).toFixed(1)}</div>
+                <div>Total IMP: {parseFloat(String(composition.result.total_imp)).toFixed(1)}</div>
+                <div>Total GMP: {parseFloat(String(composition.result.total_gmp)).toFixed(1)}</div>
+                <div>Total AMP: {parseFloat(String(composition.result.total_amp)).toFixed(1)}</div>
+                <div className="font-medium">Synergy: {parseFloat(String(composition.result.total_synergy)).toFixed(1)}</div>
               </div>
             </div>
           )}
