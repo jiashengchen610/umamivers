@@ -6,6 +6,7 @@ import { FilterRow, SortSelect } from '@/components/SearchAndFilter'
 import { IngredientCard } from '@/components/IngredientCard'
 import { UmamiChart, TCMBars, MiniBars } from '@/components/Charts'
 import SynergyRatioDial from '@/components/SynergyRatioDial'
+import TriangleChart from '@/components/TriangleChart'
 import { Ingredient, FilterState, IngredientListResponse, CompositionState } from '@/types'
 import { searchIngredients, composePreview } from '@/lib/api'
 import { getUmamiLevel } from '@/lib/umamiLevels'
@@ -407,9 +408,12 @@ const handleAddWater = () => {
     alert('Water ingredient not found in database. Please ensure it exists.')
     return
   }
-  if (onAddToComposition) {
-    onAddToComposition(waterIngredient)
-  }
+  // Add water without checking for duplicates - allow multiple additions
+  const newIngredients = [
+    ...composition.ingredients,
+    { ingredient: waterIngredient, quantity: 100, unit: 'g' }
+  ]
+  onChange({ ...composition, ingredients: newIngredients })
 }
 
   const handleTitleSave = () => {
@@ -553,18 +557,12 @@ const handleAddWater = () => {
       <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
         {composition.ingredients.length > 0 && composition.result ? (
           <>
-            <UmamiChart
-              chemistry={{
-                glu: parseFloat(String(composition.result.total_glu)),
-                asp: parseFloat(String(composition.result.total_asp)),
-                imp: parseFloat(String(composition.result.total_imp)),
-                gmp: parseFloat(String(composition.result.total_gmp)),
-                amp: parseFloat(String(composition.result.total_amp)),
-                umami_aa: parseFloat(String(composition.result.total_aa)),
-                umami_nuc: parseFloat(String(composition.result.total_nuc)),
-                umami_synergy: parseFloat(String(composition.result.total_synergy))
-              }}
-              showIndividual={false}
+            {/* Triangle Chart Visualization */}
+            <TriangleChart
+              euc={parseFloat(String(composition.result.total_aa)) + parseFloat(String(composition.result.total_nuc)) + parseFloat(String(composition.result.total_synergy))}
+              pui={composition.result.pui ?? 0}
+              aa={parseFloat(String(composition.result.total_aa))}
+              nuc={parseFloat(String(composition.result.total_nuc))}
             />
             
             {/* Umami Strength Display: Dual EUC/PUI */}
@@ -654,28 +652,30 @@ const handleAddWater = () => {
 
       {/* 8. Added Ingredient List */}
       <div className="space-y-3">
-        {composition.ingredients.length === 0 ? (
-          <p className="text-gray-500 text-center py-8 bg-gray-50 rounded-xl">
-            No ingredients selected yet. Search and add ingredients above.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="flex gap-3 pb-2">
-              {/* Dilute with Water Button */}
-              {waterIngredient && (
-                <button
-                  onClick={handleAddWater}
-                  className="paper-texture-light border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 p-4 flex flex-col items-center justify-center gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-all"
-                >
-                  <Droplet className="w-8 h-8 text-blue-600" />
-                  <div className="text-center">
-                    <div className="text-base font-medium text-blue-900">Dilute with water</div>
-                    <div className="text-xs text-blue-700 mt-1">+100g each click</div>
-                  </div>
-                </button>
-              )}
-              
-              {composition.ingredients.map(item => (
+        <div className="overflow-x-auto">
+          <div className="flex gap-3 pb-2">
+            {/* Dilute with Water Button - Always visible */}
+            {waterIngredient && (
+              <button
+                onClick={handleAddWater}
+                className="paper-texture-light border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 p-4 flex flex-col items-center justify-center gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-all"
+              >
+                <Droplet className="w-8 h-8 text-blue-600" />
+                <div className="text-center">
+                  <div className="text-base font-medium text-blue-900">Dilute with water</div>
+                  <div className="text-xs text-blue-700 mt-1">+100g each click</div>
+                </div>
+              </button>
+            )}
+            
+            {composition.ingredients.length === 0 ? (
+              <div className="paper-texture-light border border-gray-200 p-8 flex items-center justify-center min-w-[260px] flex-shrink-0">
+                <p className="text-gray-500 text-sm text-center">
+                  No ingredients yet.<br/>Search above to add.
+                </p>
+              </div>
+            ) : (
+              composition.ingredients.map(item => (
                 <div
                   key={item.ingredient.id}
                   className={`paper-texture-light border border-gray-200 p-4 flex flex-col gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-colors ${onOpenDetails ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300' : ''}`}
@@ -753,10 +753,10 @@ const handleAddWater = () => {
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
+              ))
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* 9. Composition Summary */}
