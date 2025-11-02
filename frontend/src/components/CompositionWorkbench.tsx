@@ -373,10 +373,10 @@ export function CompositionWorkbench({
                             ? item.ingredient.flags.allergens.join(', ')
                             : 'None reported'}
                         </div>
-                        {item.ingredient.flags?.dietary_restrictions?.length > 0 && (
+                        {(item.ingredient.flags?.dietary_restrictions?.length ?? 0) > 0 && (
                           <div>
                             <span className="font-medium">Dietary:</span>{' '}
-                            {item.ingredient.flags.dietary_restrictions.slice(0, 4).join(', ')}
+                            {item.ingredient.flags?.dietary_restrictions?.slice(0, 4).join(', ')}
                           </div>
                         )}
                       </div>
