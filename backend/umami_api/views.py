@@ -499,13 +499,23 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         aa_g = aa_mix_mg / Decimal('1000')
         nuc_g = nuc_mix_mg / Decimal('1000')
 
-        # Calculate EUC using simplified formula: EUC = 1219 × (AA_g × Nuc_g)
-        # Then convert back to mg MSG eq/100g
-        if nuc_g > 0:
-            euc_g = Decimal('1219') * aa_g * nuc_g
-            euc_mg = euc_g * Decimal('1000')
+        # Calculate EUC using same formula as database:
+        # EUC = weighted_aa + 1218 × weighted_aa × weighted_nuc
+        # First apply relative weights to each compound
+        weighted_aa = glu_g_per_100g * Decimal('1.0') + asp_g_per_100g * Decimal('0.077')
+        weighted_nuc = (
+            imp_g_per_100g * Decimal('1.0') +
+            gmp_g_per_100g * Decimal('2.3') +
+            amp_g_per_100g * Decimal('0.18')
+        )
+        
+        # Calculate synergy
+        if weighted_aa > 0 and weighted_nuc > 0:
+            euc_g = weighted_aa + Decimal('1218') * weighted_aa * weighted_nuc
         else:
-            euc_mg = Decimal('0')
+            euc_g = weighted_aa if weighted_aa > 0 else Decimal('0')
+        
+        euc_mg = euc_g * Decimal('1000')
 
         # Calculate PUI (Perceived Umami Index)
         # P_AA = 1 / (1 + (K_AA / AA_mix_mg)^n)  where K_AA=80, n=1.4
