@@ -128,29 +128,33 @@ def process_excel_file(excel_path: str) -> None:
                 imp = clean_numeric(row.get('IMP'))
                 gmp = clean_numeric(row.get('GMP'))
                 amp = clean_numeric(row.get('AMP'))
-                umami_aa = clean_numeric(row.get('Umami_AA'))
-                umami_nuc = clean_numeric(row.get('Umami_Nuc'))
 
                 def to_grams(value: Optional[float]) -> float:
                     return (value or 0) / 1000.0
 
-                if umami_aa is None:
-                    umami_aa = (glu or 0) + (asp or 0) if (glu or asp) else 0
-                if umami_nuc is None:
-                    umami_nuc = (imp or 0) + (gmp or 0) + (amp or 0) if (imp or gmp or amp) else 0
-                weighted_aa = to_grams(glu) * 1.0 + to_grams(asp) * 0.077
-                weighted_nuc = (
+                # Calculate weighted umami values using relative potency
+                # Relative umami intensity: Glu=1.0, Asp=0.077, IMP=1.0, GMP=2.3, AMP=0.18
+                weighted_aa_g = to_grams(glu) * 1.0 + to_grams(asp) * 0.077
+                weighted_nuc_g = (
                     to_grams(imp) * 1.0 +
                     to_grams(gmp) * 2.3 +
                     to_grams(amp) * 0.18
                 )
-                # Calculate EUC in g/100g, then convert to mg/100g
-                if weighted_aa > 0 and weighted_nuc > 0:
-                    umami_synergy_g = weighted_aa + 1218 * weighted_aa * weighted_nuc
-                    umami_synergy = umami_synergy_g * 1000  # Convert g to mg
+                
+                # Convert weighted values to mg/100g for storage
+                umami_aa = weighted_aa_g * 1000
+                umami_nuc = weighted_nuc_g * 1000
+                
+                # Calculate EUC (Equivalent Umami Concentration)
+                # Formula: EUC = weighted_AA + 1218 × weighted_AA × weighted_Nuc
+                # This represents MSG-equivalent umami intensity
+                if weighted_aa_g > 0 and weighted_nuc_g > 0:
+                    umami_synergy_g = weighted_aa_g + 1218 * weighted_aa_g * weighted_nuc_g
                 else:
-                    umami_synergy_g = weighted_aa if weighted_aa > 0 else 0
-                    umami_synergy = umami_synergy_g * 1000  # Convert g to mg
+                    # If no nucleotides, synergy = just the amino acids
+                    umami_synergy_g = weighted_aa_g if weighted_aa_g > 0 else 0
+                
+                umami_synergy = umami_synergy_g * 1000  # Convert g to mg
 
                 Chemistry.objects.create(
                     ingredient=ingredient,

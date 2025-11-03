@@ -491,55 +491,52 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         gmp_g_per_100g = gmp_mg_per_100g / Decimal('1000')
         amp_g_per_100g = amp_mg_per_100g / Decimal('1000')
 
-        # Calculate weighted concentrations in mg/100g
-        aa_mix_mg = glu_mg_per_100g + asp_mg_per_100g
-        nuc_mix_mg = imp_mg_per_100g + gmp_mg_per_100g + amp_mg_per_100g
-        
-        # Convert to g/100g for EUC calculation
-        aa_g = aa_mix_mg / Decimal('1000')
-        nuc_g = nuc_mix_mg / Decimal('1000')
-
-        # Calculate EUC using same formula as database:
-        # EUC = weighted_aa + 1218 × weighted_aa × weighted_nuc
-        # First apply relative weights to each compound
-        weighted_aa = glu_g_per_100g * Decimal('1.0') + asp_g_per_100g * Decimal('0.077')
-        weighted_nuc = (
+        # Apply relative weights to each compound for umami-equivalent calculations
+        # Relative umami intensity: Glu=1.0, Asp=0.077, IMP=1.0, GMP=2.3, AMP=0.18
+        weighted_aa_g = glu_g_per_100g * Decimal('1.0') + asp_g_per_100g * Decimal('0.077')
+        weighted_nuc_g = (
             imp_g_per_100g * Decimal('1.0') +
             gmp_g_per_100g * Decimal('2.3') +
             amp_g_per_100g * Decimal('0.18')
         )
         
-        # Calculate synergy
-        if weighted_aa > 0 and weighted_nuc > 0:
-            euc_g = weighted_aa + Decimal('1218') * weighted_aa * weighted_nuc
+        # Convert weighted values to mg/100g for display
+        weighted_aa_mg = weighted_aa_g * Decimal('1000')
+        weighted_nuc_mg = weighted_nuc_g * Decimal('1000')
+        
+        # Calculate EUC (Equivalent Umami Concentration)
+        # Formula: EUC = weighted_AA + 1218 × weighted_AA × weighted_Nuc
+        if weighted_aa_g > 0 and weighted_nuc_g > 0:
+            euc_g = weighted_aa_g + Decimal('1218') * weighted_aa_g * weighted_nuc_g
         else:
-            euc_g = weighted_aa if weighted_aa > 0 else Decimal('0')
+            # If no nucleotides, synergy = just the amino acids
+            euc_g = weighted_aa_g if weighted_aa_g > 0 else Decimal('0')
         
         euc_mg = euc_g * Decimal('1000')
 
         # Calculate PUI (Perceived Umami Index)
-        # P_AA = 1 / (1 + (K_AA / AA_mix_mg)^n)  where K_AA=80, n=1.4
-        # B_Nuc = 1 + α * (Nuc_mix_mg / (Nuc_mix_mg + K_Nuc))  where α=1.5, K_Nuc=30
+        # P_AA = 1 / (1 + (K_AA / AA_weighted_mg)^n)  where K_AA=80, n=1.4
+        # B_Nuc = 1 + α * (Nuc_weighted_mg / (Nuc_weighted_mg + K_Nuc))  where α=1.5, K_Nuc=30
         # PUI = min(P_AA * B_Nuc, 1) * 100
         # Using float for pow operation for better compatibility
         
-        if aa_mix_mg > 0:
-            ratio = float(Decimal('80') / aa_mix_mg)
+        if weighted_aa_mg > 0:
+            ratio = float(Decimal('80') / weighted_aa_mg)
             p_aa = Decimal(str(1.0 / (1.0 + pow(ratio, 1.4))))
         else:
             p_aa = Decimal('0')
         
-        if nuc_mix_mg > 0:
-            b_nuc = Decimal('1') + Decimal('1.5') * (nuc_mix_mg / (nuc_mix_mg + Decimal('30')))
+        if weighted_nuc_mg > 0:
+            b_nuc = Decimal('1') + Decimal('1.5') * (weighted_nuc_mg / (weighted_nuc_mg + Decimal('30')))
         else:
             b_nuc = Decimal('1')
         
         pui_raw = p_aa * b_nuc
         pui = min(float(pui_raw), 1.0) * 100
         
-        # Calculate AA:Nuc ratio for synergy dial
+        # Calculate AA:Nuc ratio for synergy dial (using weighted values)
         epsilon = Decimal('0.001')
-        aa_nuc_ratio = aa_mix_mg / max(nuc_mix_mg, epsilon)
+        aa_nuc_ratio = weighted_aa_mg / max(weighted_nuc_mg, epsilon)
         
         # Determine synergy zone
         if aa_nuc_ratio < Decimal('0.6'):
@@ -552,9 +549,9 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
             synergy_zone = 'needs_nuc'
             synergy_suggestion = 'Add nucleotide-rich ingredient (mushrooms, seafood, seaweed).'
 
-        # Return values in mg/100g for frontend display
-        total_aa = aa_mix_mg
-        total_nuc = nuc_mix_mg
+        # Return weighted values in mg/100g for frontend display
+        total_aa = weighted_aa_mg
+        total_nuc = weighted_nuc_mg
         total_synergy = euc_mg
 
         # Prepare chart data
@@ -569,8 +566,8 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
                 'amp': float(amp_mg_per_100g)
             },
             'breakdown': {
-                'total_aa': float(aa_mix_mg),
-                'total_nuc': float(nuc_mix_mg),
+                'total_aa': float(weighted_aa_mg),
+                'total_nuc': float(weighted_nuc_mg),
                 'total_synergy': float(euc_mg)
             }
         }
@@ -588,10 +585,10 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
             'ingredients': ingredients_data,
             'chart_data': chart_data,
             'concentrations': {
-                'aa_mg_per_100g': float(aa_mix_mg),
-                'nuc_mg_per_100g': float(nuc_mix_mg),
-                'aa_g_per_100g': float(aa_g),
-                'nuc_g_per_100g': float(nuc_g),
+                'aa_mg_per_100g': float(weighted_aa_mg),
+                'nuc_mg_per_100g': float(weighted_nuc_mg),
+                'aa_g_per_100g': float(weighted_aa_g),
+                'nuc_g_per_100g': float(weighted_nuc_g),
                 'synergy_mg_per_100g': float(euc_mg)
             },
             'pui': float(pui),
