@@ -23,7 +23,8 @@ except Exception as e:
 " || echo "Extensions may already exist, continuing..."
 
 echo "==> Loading fixtures..."
-python manage.py loaddata fixtures_ingredients.json
+# Load the corrected weighted-value fixture data
+python manage.py load_fixture_data --file ../fixture_data.json.gz --clear
 
 echo "==> Initializing water ingredient..."
 python manage.py init_water || echo "Water ingredient initialization skipped"
