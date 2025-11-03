@@ -85,7 +85,8 @@ export function IngredientDetailModal({
     if (ingredient && onAddToComposition) {
       onAddToComposition(ingredient)
       onClose()
-      window.location.href = '/'
+      // Don't navigate - just close the modal
+      // User will stay on current page (search panel if opened from there)
     }
   }
   

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { Search, X, Edit3, Droplet } from 'lucide-react'
 import { FilterRow, SortSelect } from '@/components/SearchAndFilter'
 import { IngredientCard } from '@/components/IngredientCard'
@@ -81,6 +81,7 @@ export function StructuredSearch({
   const [totalIngredientCount, setTotalIngredientCount] = useState<number | null>(null)
   const [localQuantities, setLocalQuantities] = useState<Record<number, string>>({})
   const [waterIngredient, setWaterIngredient] = useState<Ingredient | null>(null)
+  const observerTarget = useRef<HTMLDivElement>(null)
 
   const resultQuantityMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -324,6 +325,31 @@ export function StructuredSearch({
     }, 300)
     return () => clearTimeout(searchTimer)
   }, [filters, handleSearch])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!showResults || loading || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          handleSearch(filters, page + 1, false)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [showResults, loading, hasMore, page, filters, handleSearch])
 
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters)
@@ -869,18 +895,31 @@ const handleAddWater = () => {
 
               {/* Results Grid - Mobile optimized */}
               {ingredients.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 mb-6">
-                  {ingredients.map((ingredient) => (
-                    <div key={ingredient.id} className="paper-texture-light border border-gray-300 h-full">
-                      <IngredientCard
-                        ingredient={ingredient}
-                        onAddToComposition={handleAddIngredient}
-                        onOpenDetails={onOpenDetails}
-                        compact={true}
-                      />
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 mb-6">
+                    {ingredients.map((ingredient) => (
+                      <div key={ingredient.id} className="paper-texture-light border border-gray-300 h-full">
+                        <IngredientCard
+                          ingredient={ingredient}
+                          onAddToComposition={handleAddIngredient}
+                          onOpenDetails={onOpenDetails}
+                          compact={true}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Infinite scroll trigger */}
+                  <div ref={observerTarget} className="h-4" />
+                  
+                  {/* Loading more indicator */}
+                  {loading && hasMore && (
+                    <div className="text-center py-4">
+                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                      <p className="mt-2 text-sm text-gray-600">Loading more...</p>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
 
               {/* Loading/Empty States */}

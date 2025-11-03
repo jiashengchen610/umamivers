@@ -187,9 +187,22 @@ const SORT_OPTIONS = [
   { value: 'alpha', label: 'A→Z' }
 ]
 
-const umamiOptions = [
+const categoryOptions = [
+    { value: 'Mushrooms', label: 'Mushrooms' },
+    { value: 'Seasonings and Spices', label: 'Seasonings & Spices' },
+    { value: 'Algae', label: 'Algae' },
+    { value: 'Vegetables', label: 'Vegetables' },
+    { value: 'Fishes and Shellfishes', label: 'Fishes & Shellfishes' },
+    { value: 'Meats', label: 'Meats' },
+    { value: 'Fruits', label: 'Fruits' },
+    { value: 'Cereals', label: 'Cereals' },
+    { value: 'Beverages', label: 'Beverages' }
+  ]
+
+  const umamiOptions = [
     { value: 'umami_aa', label: 'Umami AA' },
-    { value: 'umami_nuc', label: 'Umami Nuc' }
+    { value: 'umami_nuc', label: 'Umami Nuc' },
+    { value: 'umami_synergy', label: 'Umami Synergy' }
   ]
   const flavorOptions = [
     { value: 'flavor_supporting', label: 'Flavor Supporting' },
@@ -227,6 +240,20 @@ const umamiOptions = [
   // Get all active filter chips
   const getActiveChips = () => {
     const chips: Array<{ label: string, onRemove: () => void }> = []
+    
+    // Category filters
+    filters.category.forEach(value => {
+      const option = categoryOptions.find(opt => opt.value === value)
+      if (option) {
+        chips.push({
+          label: option.label,
+          onRemove: () => onChange({
+            ...filters,
+            category: filters.category.filter(v => v !== value)
+          })
+        })
+      }
+    })
     
     // Umami filters
     filters.umami.forEach(value => {
@@ -307,6 +334,13 @@ const umamiOptions = [
     <div className={className}>
       {/* Filter dropdowns - horizontal scroll on mobile */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide whitespace-nowrap">
+        <FilterDropdown
+          title="Category"
+          options={categoryOptions}
+          selectedValues={filters.category}
+          onChange={(values) => onChange({ ...filters, category: values })}
+        />
+        
         <FilterDropdown
           title="Umami"
           options={umamiOptions}
