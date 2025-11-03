@@ -40,9 +40,9 @@ class Chemistry(models.Model):
     imp = models.DecimalField(max_digits=8, decimal_places=3, default=0)
     gmp = models.DecimalField(max_digits=8, decimal_places=3, default=0)
     amp = models.DecimalField(max_digits=8, decimal_places=3, default=0)
-    umami_aa = models.DecimalField(max_digits=8, decimal_places=3, default=0)
-    umami_nuc = models.DecimalField(max_digits=8, decimal_places=3, default=0)
-    umami_synergy = models.DecimalField(max_digits=8, decimal_places=3, default=0)
+    umami_aa = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    umami_nuc = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    umami_synergy = models.DecimalField(max_digits=12, decimal_places=3, default=0)  # Can store up to 999,999,999.999
 
     class Meta:
         db_table = 'chemistry'
