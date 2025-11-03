@@ -189,10 +189,8 @@ const SORT_OPTIONS = [
 
 const umamiOptions = [
     { value: 'umami_aa', label: 'Umami AA' },
-    { value: 'umami_nuc', label: 'Umami Nuc' },
-    { value: 'umami_synergy', label: 'Umami Synergy' }
+    { value: 'umami_nuc', label: 'Umami Nuc' }
   ]
-  
   const flavorOptions = [
     { value: 'flavor_supporting', label: 'Flavor Supporting' },
     { value: 'flavor_carrier', label: 'Flavor Carrier' }

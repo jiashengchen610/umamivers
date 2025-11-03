@@ -208,8 +208,9 @@ export function StructuredSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Auto-change sort based on umami filters
   useEffect(() => {
-    if (filters.sort !== 'relevance') return
+    // Only auto-change when no query is entered
     if (filters.query.trim()) return
 
     const mapping: Record<string, FilterState['sort']> = {
@@ -218,9 +219,20 @@ export function StructuredSearch({
       umami_synergy: 'synergy'
     }
 
-    const targetSort = filters.umami.find(tag => mapping[tag])
-      ? mapping[filters.umami.find(tag => mapping[tag]) as keyof typeof mapping]
-      : undefined
+    // Determine target sort based on selected umami filters
+    const selectedUmamiFilters = filters.umami.filter(tag => mapping[tag])
+    
+    let targetSort: FilterState['sort'] | undefined
+    if (selectedUmamiFilters.length === 0) {
+      // No umami filters, reset to relevance
+      targetSort = 'relevance'
+    } else if (selectedUmamiFilters.length === 1) {
+      // Single umami filter, sort by that metric
+      targetSort = mapping[selectedUmamiFilters[0] as keyof typeof mapping]
+    } else {
+      // Multiple umami filters, sort by synergy
+      targetSort = 'synergy'
+    }
 
     if (targetSort && targetSort !== filters.sort) {
       setFilters(prev => ({ ...prev, sort: targetSort }))
@@ -268,9 +280,12 @@ export function StructuredSearch({
   const handleSearch = useCallback(async (
     searchFilters: FilterState, 
     newPage: number = 1, 
-    reset: boolean = false
+    reset: boolean = false,
+    forceShow: boolean = false
   ) => {
-    if (!searchFilters.query.trim() && !hasActiveFilters) {
+    // Only clear results if user has typed something and then deleted it
+    // Don't clear when forceShow is true (e.g., on focus)
+    if (!searchFilters.query.trim() && !hasActiveFilters && !forceShow) {
       setIngredients([])
       setResultCount(totalIngredientCount ?? 0)
       setShowResults(false)
@@ -321,6 +336,12 @@ export function StructuredSearch({
     setShowResults(false) // Close overlay when ingredient is added
   }
 
+  const handleCloseSearchPanel = () => {
+    setShowResults(false)
+    // Clear all filters when closing the search panel
+    setFilters(initialFilters)
+  }
+
   const handleClearComposition = () => {
     setIngredients([])
     setShowResults(false)
@@ -329,9 +350,7 @@ export function StructuredSearch({
 
 const handleClearFilters = () => {
   setFilters(initialFilters)
-  setIngredients([])
-  setResultCount(totalIngredientCount ?? 0)
-  setShowResults(false)
+  // Don't close the panel or clear ingredients - let the search continue
 }
 
 const removeIngredient = (ingredientId: number) => {
@@ -462,8 +481,10 @@ const handleAddWater = () => {
           value={filters.query}
           onChange={(e) => handleFilterChange({ ...filters, query: e.target.value })}
           onFocus={() => {
-            // Always show results when user focuses search, even without typing
+            // Show all ingredients when user focuses search
             setShowResults(true)
+            // Trigger search with forceShow to display all ingredients
+            handleSearch(filters, 1, true, true)
           }}
           placeholder="Search ingredients by name, umami properties, or TCM attributes..."
           className="block w-full pl-12 pr-12 py-3 h-11 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-lg transition-all"
@@ -754,9 +775,9 @@ const handleAddWater = () => {
 
                   {item.ingredient.chemistry && (
                     <LevelBars 
-                      aa={item.ingredient.chemistry.umami_aa}
-                      nuc={item.ingredient.chemistry.umami_nuc}
-                      synergy={item.ingredient.chemistry.umami_synergy}
+                      aa={item.ingredient.chemistry.umami_aa ?? 0}
+                      nuc={item.ingredient.chemistry.umami_nuc ?? 0}
+                      synergy={item.ingredient.chemistry.umami_synergy ?? 0}
                       size="small"
                     />
                   )}
@@ -780,8 +801,8 @@ const handleAddWater = () => {
         </div>
       </div>
 
-      {/* 9. Composition Summary */}
-      {shouldShowResults && showResults && (
+      {/* 9. Search Results Overlay */}
+      {showResults && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{
           background: 'rgba(255, 255, 255, 0.95)', // Increased opacity
           backdropFilter: 'blur(16px)',
@@ -803,7 +824,7 @@ const handleAddWater = () => {
                   className="block w-full pl-12 pr-12 py-3 h-11 text-base border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button
-                  onClick={() => setShowResults(false)}
+                  onClick={handleCloseSearchPanel}
                   className="btn-circular-sm absolute top-1/2 right-2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                 >
                   <X className="h-4 w-4" />
