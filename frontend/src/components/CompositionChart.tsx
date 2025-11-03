@@ -9,7 +9,6 @@ interface CompositionChartProps {
   nuc: number // mg/100g
   synergy: number // EUC value
   pui?: number // Perceived Umami Index
-  onRatioChange?: (aaPercent: number, nucPercent: number) => void
   className?: string
 }
 
@@ -18,7 +17,6 @@ export function CompositionChart({
   nuc, 
   synergy, 
   pui,
-  onRatioChange,
   className = '' 
 }: CompositionChartProps) {
   
@@ -51,13 +49,12 @@ export function CompositionChart({
         </div>
       </div>
       
-      {/* Balance Slider */}
+      {/* Balance Indicator */}
       <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Adjust Balance</h3>
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Balance Analysis</h3>
         <BalanceSlider 
           aa={aa} 
-          nuc={nuc} 
-          onRatioChange={onRatioChange}
+          nuc={nuc}
         />
       </div>
       

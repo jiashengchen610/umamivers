@@ -29,10 +29,11 @@ export function LevelBars({ aa, nuc, synergy, size = 'small', className = '' }: 
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className={`flex-1 ${barHeight} rounded-sm transition-all`}
+              className={`flex-1 ${barHeight} transition-all`}
               style={{
                 backgroundColor: i <= level ? color : '#E5E7EB',
-                opacity: i <= level ? 1 : 0.3
+                opacity: i <= level ? 1 : 0.3,
+                borderRadius: i === 1 ? '4px 0 0 4px' : i === 6 ? '0 4px 4px 0' : '0'
               }}
             />
           ))}
