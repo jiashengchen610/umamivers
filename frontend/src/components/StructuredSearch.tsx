@@ -462,10 +462,8 @@ const handleAddWater = () => {
           value={filters.query}
           onChange={(e) => handleFilterChange({ ...filters, query: e.target.value })}
           onFocus={() => {
-            if (!hasActiveQuery && !hasActiveFilters) {
-              // Show all ingredients when user focuses on empty search
-              setShowResults(true)
-            }
+            // Always show results when user focuses search, even without typing
+            setShowResults(true)
           }}
           placeholder="Search ingredients by name, umami properties, or TCM attributes..."
           className="block w-full pl-12 pr-12 py-3 h-11 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-lg transition-all"
@@ -531,7 +529,7 @@ const handleAddWater = () => {
             >
               <Edit3 className="w-4 h-4" />
             </button>
-            <h2 className="text-xl font-semibold text-gray-900 flex-1">{comboTitle}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 flex-1 line-clamp-2">{comboTitle}</h2>
           </>
         )}
         {composition.ingredients.length > 0 && (
