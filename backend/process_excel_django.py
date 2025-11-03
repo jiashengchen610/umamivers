@@ -144,10 +144,13 @@ def process_excel_file(excel_path: str) -> None:
                     to_grams(gmp) * 2.3 +
                     to_grams(amp) * 0.18
                 )
+                # Calculate EUC in g/100g, then convert to mg/100g
                 if weighted_aa > 0 and weighted_nuc > 0:
-                    umami_synergy = weighted_aa + 1218 * weighted_aa * weighted_nuc
+                    umami_synergy_g = weighted_aa + 1218 * weighted_aa * weighted_nuc
+                    umami_synergy = umami_synergy_g * 1000  # Convert g to mg
                 else:
-                    umami_synergy = weighted_aa if weighted_aa > 0 else 0
+                    umami_synergy_g = weighted_aa if weighted_aa > 0 else 0
+                    umami_synergy = umami_synergy_g * 1000  # Convert g to mg
 
                 Chemistry.objects.create(
                     ingredient=ingredient,
