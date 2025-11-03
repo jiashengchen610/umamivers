@@ -17,46 +17,49 @@ export const COLORS = {
 }
 
 /**
- * Get AA level (0-6) based on mg/100g
+ * Get AA level (0-6) based on weighted mg/100g
+ * Thresholds based on actual data distribution (P25, P50, P75, P90, P95)
  * Pale green to deep forest green
  */
 export function getAALevel(mg: number): UmamiLevel6 {
   if (mg === 0) return { level: 0, label: 'None', color: '#F3F4F6' }
-  if (mg <= 10) return { level: 1, label: 'Very Low', color: '#EEF4EB' }
-  if (mg <= 30) return { level: 2, label: 'Low', color: '#D4E5CF' }
-  if (mg <= 80) return { level: 3, label: 'Moderate', color: '#B0D1A7' }
-  if (mg <= 150) return { level: 4, label: 'High', color: '#8AB87F' }
-  if (mg <= 300) return { level: 5, label: 'Very High', color: '#73A36A' }
-  return { level: 6, label: 'Exceptional', color: '#5E8756' }
+  if (mg <= 13) return { level: 1, label: 'Very Low', color: '#EEF4EB' }  // ~P25
+  if (mg <= 50) return { level: 2, label: 'Low', color: '#D4E5CF' }       // ~P50
+  if (mg <= 260) return { level: 3, label: 'Moderate', color: '#B0D1A7' } // ~P75
+  if (mg <= 740) return { level: 4, label: 'High', color: '#8AB87F' }     // ~P90
+  if (mg <= 1330) return { level: 5, label: 'Very High', color: '#73A36A' } // ~P95
+  return { level: 6, label: 'Exceptional', color: '#5E8756' }              // >P95
 }
 
 /**
- * Get Nuc level (0-6) based on mg/100g
+ * Get Nuc level (0-6) based on weighted mg/100g
+ * Thresholds based on actual data distribution (P25, P50, P75, P90, P95)
  * Light sand to rich caramel brown
  */
 export function getNucLevel(mg: number): UmamiLevel6 {
   if (mg === 0) return { level: 0, label: 'None', color: '#F3F4F6' }
-  if (mg <= 5) return { level: 1, label: 'Very Low', color: '#FAF3E8' }
-  if (mg <= 15) return { level: 2, label: 'Low', color: '#EFD9BA' }
-  if (mg <= 40) return { level: 3, label: 'Moderate', color: '#DBBB8A' }
-  if (mg <= 80) return { level: 4, label: 'High', color: '#C69D5E' }
-  if (mg <= 150) return { level: 5, label: 'Very High', color: '#B8863A' }
-  return { level: 6, label: 'Exceptional', color: '#A86D1C' }
+  if (mg <= 15) return { level: 1, label: 'Very Low', color: '#FAF3E8' }   // ~P25
+  if (mg <= 75) return { level: 2, label: 'Low', color: '#EFD9BA' }        // ~P50
+  if (mg <= 290) return { level: 3, label: 'Moderate', color: '#DBBB8A' }  // ~P75
+  if (mg <= 650) return { level: 4, label: 'High', color: '#C69D5E' }      // ~P90
+  if (mg <= 870) return { level: 5, label: 'Very High', color: '#B8863A' } // ~P95
+  return { level: 6, label: 'Exceptional', color: '#A86D1C' }               // >P95
 }
 
 /**
- * Get Synergy level (0-6) based on EUC value
+ * Get Synergy level (0-6) based on EUC value (mg MSG eq/100g)
+ * Thresholds based on actual data distribution (P25, P50, P75, P90, P95)
  * Soft lilac to vibrant violet
- * Using formula: U = 8([AA] + 1218 × [AA] × [NUC])
+ * Using formula: EUC = weighted_AA + 1218 × weighted_AA × weighted_Nuc
  */
 export function getSynergyLevel(euc: number): UmamiLevel6 {
   if (euc === 0) return { level: 0, label: 'None', color: '#F3F4F6' }
-  if (euc <= 100) return { level: 1, label: 'Very Low', color: '#F9F3FC' }
-  if (euc <= 400) return { level: 2, label: 'Low', color: '#EBD9F4' }
-  if (euc <= 1000) return { level: 3, label: 'Moderate', color: '#D5B5ED' }
-  if (euc <= 3000) return { level: 4, label: 'High', color: '#C091E7' }
-  if (euc <= 8000) return { level: 5, label: 'Very High', color: '#B67BE5' }
-  return { level: 6, label: 'Exceptional', color: '#A865E4' }
+  if (euc <= 16) return { level: 1, label: 'Very Low', color: '#F9F3FC' }     // ~P25
+  if (euc <= 76) return { level: 2, label: 'Low', color: '#EBD9F4' }          // ~P50
+  if (euc <= 400) return { level: 3, label: 'Moderate', color: '#D5B5ED' }    // ~P75
+  if (euc <= 1900) return { level: 4, label: 'High', color: '#C091E7' }       // ~P90
+  if (euc <= 11800) return { level: 5, label: 'Very High', color: '#B67BE5' } // ~P95
+  return { level: 6, label: 'Exceptional', color: '#A865E4' }                  // >P95 (up to 448,753!)
 }
 
 /**

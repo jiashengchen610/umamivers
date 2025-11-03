@@ -169,29 +169,29 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
     def _apply_umami_filters(self, queryset, umami_filters):
-        """Apply umami-related filters based on chart levels (level 4+)
-        Level 4 thresholds:
-        - AA: 80 mg/100g
-        - Nuc: 40 mg/100g  
-        - Synergy: 1000 mg/100g
+        """Apply umami-related filters based on chart levels (level 4+ = High)
+        Level 4 thresholds based on weighted values at ~P90:
+        - AA: 740 mg/100g (weighted)
+        - Nuc: 650 mg/100g (weighted) 
+        - Synergy: 1900 mg/100g (EUC)
         """
         umami_query = Q()
         for filter_type in umami_filters:
             if filter_type == 'umami_aa':
-                # Level 4+ for AA: >= 80 mg/100g
-                umami_query |= Q(chemistry__umami_aa__gte=80)
+                # Level 4+ for AA: >= 740 mg/100g (weighted)
+                umami_query |= Q(chemistry__umami_aa__gte=740)
             elif filter_type == 'umami_nuc':
-                # Level 4+ for Nuc: >= 40 mg/100g
-                umami_query |= Q(chemistry__umami_nuc__gte=40)
+                # Level 4+ for Nuc: >= 650 mg/100g (weighted)
+                umami_query |= Q(chemistry__umami_nuc__gte=650)
             elif filter_type == 'umami_synergy':
-                # Level 4+ for Synergy: >= 1000 mg/100g
-                umami_query |= Q(chemistry__umami_synergy__gte=1000)
+                # Level 4+ for Synergy: >= 1900 mg/100g (EUC)
+                umami_query |= Q(chemistry__umami_synergy__gte=1900)
         
         return queryset.filter(umami_query)
 
     def _apply_flavor_filters(self, queryset, flavor_filters):
         """Apply flavor role filters based on ingredient type and umami levels
-        - High Umami: AA >= 80 OR Nuc >= 40 OR Synergy >= 1000 (level 4+)
+        - High Umami: AA >= 740 OR Nuc >= 650 OR Synergy >= 1900 (level 4+)
         - Flavor Carrier: Staple foods (rice, bread, noodles, pasta, flour, wheat, grain)
         - Flavor Supporting: Everything else
         """
@@ -199,11 +199,11 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         
         for filter_type in flavor_filters:
             if filter_type == 'high_umami':
-                # Level 4+ on any metric
+                # Level 4+ on any metric (weighted values)
                 flavor_query |= (
-                    Q(chemistry__umami_aa__gte=80) |
-                    Q(chemistry__umami_nuc__gte=40) |
-                    Q(chemistry__umami_synergy__gte=1000)
+                    Q(chemistry__umami_aa__gte=740) |
+                    Q(chemistry__umami_nuc__gte=650) |
+                    Q(chemistry__umami_synergy__gte=1900)
                 )
             elif filter_type == 'flavor_carrier':
                 # Staple foods - search in name and category
@@ -217,18 +217,18 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
                     )
                 # Exclude high umami items
                 staples_query &= ~(
-                    Q(chemistry__umami_aa__gte=80) |
-                    Q(chemistry__umami_nuc__gte=40) |
-                    Q(chemistry__umami_synergy__gte=1000)
+                    Q(chemistry__umami_aa__gte=740) |
+                    Q(chemistry__umami_nuc__gte=650) |
+                    Q(chemistry__umami_synergy__gte=1900)
                 )
                 flavor_query |= staples_query
                 
             elif filter_type == 'flavor_supporting':
                 # Everything that's not high umami and not a carrier
                 high_umami = (
-                    Q(chemistry__umami_aa__gte=80) |
-                    Q(chemistry__umami_nuc__gte=40) |
-                    Q(chemistry__umami_synergy__gte=1000)
+                    Q(chemistry__umami_aa__gte=740) |
+                    Q(chemistry__umami_nuc__gte=650) |
+                    Q(chemistry__umami_synergy__gte=1900)
                 )
                 staples = Q()
                 staple_terms = ['rice', 'bread', 'noodle', 'pasta', 'flour', 'wheat', 'grain']
