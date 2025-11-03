@@ -3,6 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { Ingredient } from '@/types'
 import { LevelBars } from './LevelBars'
+import { getAALevel, getNucLevel, getSynergyLevel } from '@/lib/umamiLevels6'
 
 type LabelMap = Record<string, string>
 
@@ -158,18 +159,31 @@ export function IngredientCard({
     dietaryLineTwo = dietaryLineTwo ? `${dietaryLineTwo} +${remainingDietary}` : `+${remainingDietary}`
   }
 
-  // Determine card role type based on tags
-  const roleType = flags?.flavor_tags?.includes('flavor_supporting') 
-    ? 'Flavor Supporting'
-    : flags?.flavor_tags?.includes('flavor_carrier')
-    ? 'Flavor Carrier' 
-    : flags?.umami_tags?.includes('umami_carrier')
-    ? 'Umami Carrier'
-    : chemistry?.umami_aa && chemistry?.umami_nuc 
-    ? `High Umami (AA+Nuc)`
-    : chemistry?.umami_aa && chemistry.umami_aa > (chemistry?.umami_nuc || 0)
-    ? 'High Umami(AA)'
-    : 'Ingredient'
+  // Determine card role type based on chart levels
+  const aa = parseFloat(chemistry?.umami_aa?.toString() || '0')
+  const nuc = parseFloat(chemistry?.umami_nuc?.toString() || '0')
+  const synergy = parseFloat(chemistry?.umami_synergy?.toString() || '0')
+  
+  const aaLevel = getAALevel(aa).level
+  const nucLevel = getNucLevel(nuc).level
+  const synLevel = getSynergyLevel(synergy).level
+  
+  // Staple foods that carry flavor
+  const flavorCarriers = ['rice', 'bread', 'noodle', 'pasta', 'flour', 'wheat', 'grain']
+  const isFlavorCarrier = flavorCarriers.some(term => 
+    displayName.toLowerCase().includes(term) || 
+    ingredient.base_name.toLowerCase().includes(term) ||
+    ingredient.category?.toLowerCase().includes(term)
+  )
+  
+  // High Umami: at least one metric reaches level 4+
+  const isHighUmami = aaLevel >= 4 || nucLevel >= 4 || synLevel >= 4
+  
+  const roleType = isHighUmami
+    ? 'High Umami'
+    : isFlavorCarrier
+    ? 'Flavor Carrier'
+    : 'Flavor Supporting'
 
   const handleCardClick = () => {
     if (!onOpenDetails) return
@@ -224,24 +238,6 @@ export function IngredientCard({
             {flavors.length > 0 && qi.length > 0 && <span>•</span>}
             {qi.length > 0 && <span>{qi.join(', ')}</span>}
           </div>
-        </div>
-      )}
-
-      {/* Allergens & dietary tags */}
-      {(allergenItems.length > 0 || formattedReligiousDietary.length > 0) && (
-        <div className="mb-2 space-y-2">
-          {allergenItems.length > 0 && (
-            <TagRow items={allergenItems} map={ALLERGEN_LABELS} label="Allergens" />
-          )}
-          {formattedReligiousDietary.length > 0 && (
-            <div className="text-xs text-gray-700 space-y-1">
-              <div className="font-medium">Dietary</div>
-              <div className="space-y-1">
-                {dietaryLineOne && <div className="break-words" title={dietaryLineOne}>{dietaryLineOne}</div>}
-                {dietaryLineTwo && <div className="break-words" title={formattedReligiousDietary.slice(2).join(', ')}>{dietaryLineTwo}</div>}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

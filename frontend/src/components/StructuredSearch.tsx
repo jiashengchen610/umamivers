@@ -461,6 +461,12 @@ const handleAddWater = () => {
           type="text"
           value={filters.query}
           onChange={(e) => handleFilterChange({ ...filters, query: e.target.value })}
+          onFocus={() => {
+            if (!hasActiveQuery && !hasActiveFilters) {
+              // Show all ingredients when user focuses on empty search
+              setShowResults(true)
+            }
+          }}
           placeholder="Search ingredients by name, umami properties, or TCM attributes..."
           className="block w-full pl-12 pr-12 py-3 h-11 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-lg transition-all"
         />
@@ -540,17 +546,23 @@ const handleAddWater = () => {
 
       {composition.ingredients.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          {composition.ingredients.map(item => (
-            <button
-              type="button"
-              key={`chip-${item.ingredient.id}`}
-              onClick={() => removeIngredient(item.ingredient.id)}
-              className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-xs font-medium text-gray-700 border border-gray-300 transition-colors"
-            >
-              {item.ingredient.display_name || item.ingredient.base_name}
-              <span className="ml-2 text-gray-500">×</span>
-            </button>
-          ))}
+          {composition.ingredients.map(item => {
+            const name = item.ingredient.display_name || item.ingredient.base_name
+            const truncatedName = name.length > 12 ? `${name.substring(0, 12)}…` : name
+            
+            return (
+              <button
+                type="button"
+                key={`chip-${item.ingredient.id}`}
+                onClick={() => removeIngredient(item.ingredient.id)}
+                className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-xs font-medium text-gray-700 border border-gray-300 transition-colors text-left"
+                title={name}
+              >
+                {truncatedName}
+                <span className="ml-2 text-gray-500">×</span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -672,11 +684,20 @@ const handleAddWater = () => {
             )}
             
             {composition.ingredients.length === 0 ? (
-              <div className="paper-texture-light border border-gray-200 p-8 flex items-center justify-center min-w-[260px] flex-shrink-0">
-                <p className="text-gray-500 text-sm text-center">
-                  No ingredients yet.<br/>Search above to add.
+              <button
+                onClick={() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                  setTimeout(() => {
+                    const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement
+                    searchInput?.focus()
+                  }, 500)
+                }}
+                className="paper-texture-light border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 p-8 flex items-center justify-center min-w-[260px] flex-shrink-0 transition-all cursor-pointer"
+              >
+                <p className="text-gray-500 hover:text-blue-700 text-sm text-center transition-colors">
+                  No ingredients yet.<br/>Tap to search and add.
                 </p>
-              </div>
+              </button>
             ) : (
               composition.ingredients.map(item => (
                 <div
