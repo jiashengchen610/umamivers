@@ -4,7 +4,7 @@
  */
 
 export interface UmamiLevel6 {
-  level: 1 | 2 | 3 | 4 | 5 | 6
+  level: 0 | 1 | 2 | 3 | 4 | 5 | 6
   label: string
   color: string
 }
@@ -17,10 +17,11 @@ export const COLORS = {
 }
 
 /**
- * Get AA level (1-6) based on mg/100g
+ * Get AA level (0-6) based on mg/100g
  * Pale green to deep forest green
  */
 export function getAALevel(mg: number): UmamiLevel6 {
+  if (mg === 0) return { level: 0, label: 'None', color: '#F3F4F6' }
   if (mg <= 10) return { level: 1, label: 'Very Low', color: '#EEF4EB' }
   if (mg <= 30) return { level: 2, label: 'Low', color: '#D4E5CF' }
   if (mg <= 80) return { level: 3, label: 'Moderate', color: '#B0D1A7' }
@@ -30,10 +31,11 @@ export function getAALevel(mg: number): UmamiLevel6 {
 }
 
 /**
- * Get Nuc level (1-6) based on mg/100g
+ * Get Nuc level (0-6) based on mg/100g
  * Light sand to rich caramel brown
  */
 export function getNucLevel(mg: number): UmamiLevel6 {
+  if (mg === 0) return { level: 0, label: 'None', color: '#F3F4F6' }
   if (mg <= 5) return { level: 1, label: 'Very Low', color: '#FAF3E8' }
   if (mg <= 15) return { level: 2, label: 'Low', color: '#EFD9BA' }
   if (mg <= 40) return { level: 3, label: 'Moderate', color: '#DBBB8A' }
@@ -43,11 +45,12 @@ export function getNucLevel(mg: number): UmamiLevel6 {
 }
 
 /**
- * Get Synergy level (1-6) based on EUC value
+ * Get Synergy level (0-6) based on EUC value
  * Soft lilac to vibrant violet
  * Using formula: U = 8([AA] + 1218 × [AA] × [NUC])
  */
 export function getSynergyLevel(euc: number): UmamiLevel6 {
+  if (euc === 0) return { level: 0, label: 'None', color: '#F3F4F6' }
   if (euc <= 100) return { level: 1, label: 'Very Low', color: '#F9F3FC' }
   if (euc <= 400) return { level: 2, label: 'Low', color: '#EBD9F4' }
   if (euc <= 1000) return { level: 3, label: 'Moderate', color: '#D5B5ED' }
@@ -59,10 +62,18 @@ export function getSynergyLevel(euc: number): UmamiLevel6 {
 /**
  * Format value for display
  */
-export function formatValue(value: number): string {
-  if (value < 1) return value.toFixed(2)
-  if (value < 10) return value.toFixed(1)
-  return Math.round(value).toString()
+export function formatValue(value: number | string | null | undefined): string {
+  // Handle null, undefined, or non-numeric values
+  if (value == null || value === '') return '0'
+  
+  const numValue = typeof value === 'string' ? parseFloat(value) : value
+  
+  // Handle NaN or invalid numbers
+  if (isNaN(numValue)) return '0'
+  
+  if (numValue < 1) return numValue.toFixed(2)
+  if (numValue < 10) return numValue.toFixed(1)
+  return Math.round(numValue).toString()
 }
 
 /**
@@ -79,5 +90,31 @@ export function calculateRatio(aa: number, nuc: number): { aa: number; nuc: numb
     aa: aaPercent,
     nuc: nucPercent,
     text: `${aaPercent}:${nucPercent}`
+  }
+}
+
+/**
+ * Get descriptive text for umami level
+ */
+export function getUmamiDescription(synergy: number): string {
+  const level = getSynergyLevel(synergy)
+  
+  switch (level.level) {
+    case 0:
+      return 'No umami detected'
+    case 1:
+      return 'Minimal umami presence'
+    case 2:
+      return 'Subtle umami notes'
+    case 3:
+      return 'Achieves balanced umami'
+    case 4:
+      return 'Strong umami character'
+    case 5:
+      return 'Rich umami intensity'
+    case 6:
+      return 'Exceptional umami depth'
+    default:
+      return 'Balanced umami profile'
   }
 }

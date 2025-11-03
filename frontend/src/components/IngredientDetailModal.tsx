@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, Info } from 'lucide-react'
 import { Ingredient } from '@/types'
 import { getIngredient } from '@/lib/api'
-import { UmamiChart, TCMBars } from './Charts'
+import { TCMBars } from './Charts'
+import { LevelBars } from './LevelBars'
+import { formatValue } from '@/lib/umamiLevels6'
 
 const RELIGIOUS_DIETARY_KEYS = new Set(['halal', 'kosher'])
 
@@ -85,6 +87,15 @@ export function IngredientDetailModal({
       onClose()
       window.location.href = '/'
     }
+  }
+  
+  const handleIngredientClick = (id: number) => {
+    // Update URL to open the new ingredient modal
+    const params = new URLSearchParams(window.location.search)
+    params.set('ingredient', id.toString())
+    window.history.pushState({}, '', `?${params.toString()}`)
+    // Trigger re-fetch by updating state
+    window.location.href = `?${params.toString()}`
   }
 
   const name = ingredient?.display_name || ingredient?.base_name
@@ -184,8 +195,31 @@ export function IngredientDetailModal({
                 <section className="px-4 sm:px-8 py-8 bg-white space-y-8">
                   <div className="grid gap-6 lg:grid-cols-2">
                     {ingredient.chemistry && (
-                      <div className="paper-texture-light border border-gray-200 p-4 sm:p-6">
-                        <UmamiChart chemistry={ingredient.chemistry} />
+                      <div className="paper-texture-light border border-gray-200 p-4 sm:p-6 space-y-4">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-lg font-semibold text-gray-900">Umami Profile</h3>
+                            <a
+                              href="/how-to-use#level-system"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Learn about the 6-level system"
+                            >
+                              <Info className="w-4 h-4" />
+                            </a>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Total Umami: <span className="font-medium">{formatValue(ingredient.chemistry.umami_synergy)} mg/100g</span>
+                          </p>
+                        </div>
+                        <LevelBars 
+                          aa={ingredient.chemistry.umami_aa}
+                          nuc={ingredient.chemistry.umami_nuc}
+                          synergy={ingredient.chemistry.umami_synergy}
+                          size="large"
+                          showValues={true}
+                        />
                       </div>
                     )}
                     {ingredient.tcm && (
@@ -216,9 +250,16 @@ export function IngredientDetailModal({
                           {ingredient.complementary?.length ? (
                             <div className="text-sm text-gray-700">
                               <div className="text-xs font-medium uppercase text-gray-500 mb-1">Synergistic partners</div>
-                              <ul className="space-y-1 list-disc list-inside text-gray-600">
+                              <ul className="space-y-1 text-gray-600">
                                 {ingredient.complementary.slice(0, 4).map(item => (
-                                  <li key={item.id}>{item.display_name || item.base_name}</li>
+                                  <li key={item.id} className="ml-4">
+                                    <button
+                                      onClick={() => handleIngredientClick(item.id)}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                                    >
+                                      {item.display_name || item.base_name}
+                                    </button>
+                                  </li>
                                 ))}
                               </ul>
                             </div>
@@ -226,9 +267,16 @@ export function IngredientDetailModal({
                           {ingredient.similar?.length ? (
                             <div className="text-sm text-gray-700">
                               <div className="text-xs font-medium uppercase text-gray-500 mb-1">Similar profile</div>
-                              <ul className="space-y-1 list-disc list-inside text-gray-600">
+                              <ul className="space-y-1 text-gray-600">
                                 {ingredient.similar.slice(0, 4).map(item => (
-                                  <li key={item.id}>{item.display_name || item.base_name}</li>
+                                  <li key={item.id} className="ml-4">
+                                    <button
+                                      onClick={() => handleIngredientClick(item.id)}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                                    >
+                                      {item.display_name || item.base_name}
+                                    </button>
+                                  </li>
                                 ))}
                               </ul>
                             </div>

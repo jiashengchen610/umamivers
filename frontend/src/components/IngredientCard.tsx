@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent } from 'react'
 import { Ingredient } from '@/types'
+import { LevelBars } from './LevelBars'
 
 type LabelMap = Record<string, string>
 
@@ -201,48 +202,14 @@ export function IngredientCard({
           </h3>
         </div>
         
-        {/* Umami Chart - Mobile optimized */}
+        {/* Umami Level Bars */}
         {chemistry && (
-          <div className="w-full">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <div className="chart-element w-2 h-2 bg-orange-500 flex-shrink-0"></div>
-                <div className="chart-element flex-1 h-1.5 bg-gray-200 overflow-hidden min-w-0">
-                  <div
-                    className="h-full bg-orange-500 transition-all duration-300"
-                    style={{ width: `${Math.min(100, (parseFloat(chemistry.umami_aa?.toString() || '0') / 1000) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-400 tabular-nums w-8 text-right">
-                  {parseFloat(chemistry.umami_aa?.toString() || '0').toFixed(0)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="chart-element w-2 h-2 bg-yellow-600 flex-shrink-0"></div>
-                <div className="chart-element flex-1 h-1.5 bg-gray-200 overflow-hidden min-w-0">
-                  <div
-                    className="h-full bg-yellow-600 transition-all duration-300"
-                    style={{ width: `${Math.min(100, (parseFloat(chemistry.umami_nuc?.toString() || '0') / 500) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-400 tabular-nums w-8 text-right">
-                  {parseFloat(chemistry.umami_nuc?.toString() || '0').toFixed(0)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="chart-element w-2 h-2 bg-purple-400 flex-shrink-0"></div>
-                <div className="chart-element flex-1 h-1.5 bg-gray-200 overflow-hidden min-w-0">
-                  <div
-                    className="h-full bg-purple-400 transition-all duration-300"
-                    style={{ width: `${Math.min(100, (parseFloat(chemistry.umami_synergy?.toString() || '0') / 1500) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-400 tabular-nums w-8 text-right">
-                  {parseFloat(chemistry.umami_synergy?.toString() || '0').toFixed(0)}
-                </span>
-              </div>
-            </div>
-          </div>
+          <LevelBars 
+            aa={parseFloat(chemistry.umami_aa?.toString() || '0')}
+            nuc={parseFloat(chemistry.umami_nuc?.toString() || '0')}
+            synergy={parseFloat(chemistry.umami_synergy?.toString() || '0')}
+            size="small"
+          />
         )}
       </div>
 

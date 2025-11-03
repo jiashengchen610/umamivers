@@ -11,6 +11,38 @@ interface BalanceSliderProps {
 export function BalanceSlider({ aa, nuc, className = '' }: BalanceSliderProps) {
   const ratio = calculateRatio(aa, nuc)
   
+  // Generate gradient that shows proportion with darkest color at 50% midpoint
+  const generateGradient = () => {
+    const aaPercent = ratio.aa
+    const nucPercent = ratio.nuc
+    
+    // AA colors: lightest to darkest
+    const aaLight = '#EEF4EB'
+    const aaDark = '#5E8756'
+    
+    // Nuc colors: lightest to darkest  
+    const nucLight = '#FAF3E8'
+    const nucDark = '#A86D1C'
+    
+    if (aaPercent >= 50) {
+      // AA dominant: show AA gradient from light to dark at 50%, then transition to Nuc
+      return `linear-gradient(to right, 
+        ${aaLight} 0%, 
+        ${aaDark} 50%, 
+        ${nucLight} ${aaPercent}%, 
+        ${nucLight} 100%
+      )`
+    } else {
+      // Nuc dominant: show AA area, then Nuc gradient with dark at 50%
+      return `linear-gradient(to right, 
+        ${aaLight} 0%, 
+        ${aaLight} ${aaPercent}%, 
+        ${nucDark} 50%, 
+        ${nucLight} 100%
+      )`
+    }
+  }
+  
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between text-xs text-gray-600">
@@ -20,11 +52,11 @@ export function BalanceSlider({ aa, nuc, className = '' }: BalanceSliderProps) {
       
       {/* Static Balance Bar with Gradient */}
       <div className="relative h-10 rounded-lg overflow-hidden">
-        {/* Gradient background: light to dark in center */}
+        {/* Gradient background: proportional with darkest at 50% */}
         <div 
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(to right, #EEF4EB 0%, #5E8756 50%, #A86D1C 50%, #FAF3E8 100%)`
+            background: generateGradient()
           }}
         />
         
@@ -41,7 +73,7 @@ export function BalanceSlider({ aa, nuc, className = '' }: BalanceSliderProps) {
         />
         
         {/* Labels */}
-        <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-medium text-white">
+        <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-medium text-black">
           <span>AA {ratio.aa}%</span>
           <span>Nuc {ratio.nuc}%</span>
         </div>
@@ -49,7 +81,7 @@ export function BalanceSlider({ aa, nuc, className = '' }: BalanceSliderProps) {
       
       {/* Educational note */}
       <p className="text-xs text-gray-600 leading-relaxed">
-        Theoretically, the strongest umami synergy occurs around a <span className="font-medium">50:50 balance</span> between amino acids and nucleotides, where the 1218× multiplier effect is maximized.
+        Peak synergy occurs at a <span className="font-medium">50:50 balance</span>, maximizing the 1218× multiplier effect.
       </p>
     </div>
   )

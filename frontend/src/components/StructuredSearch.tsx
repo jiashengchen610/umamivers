@@ -6,6 +6,7 @@ import { FilterRow, SortSelect } from '@/components/SearchAndFilter'
 import { IngredientCard } from '@/components/IngredientCard'
 import { UmamiChart, TCMBars, MiniBars, LevelBars } from '@/components/Charts'
 import { CompositionChart } from '@/components/CompositionChart'
+import { BalanceSlider } from '@/components/BalanceSlider'
 import SynergyRatioDial from '@/components/SynergyRatioDial'
 import { Ingredient, FilterState, IngredientListResponse, CompositionState } from '@/types'
 import { searchIngredients, composePreview } from '@/lib/api'
@@ -581,14 +582,66 @@ const handleAddWater = () => {
             />
           </>
         ) : (
-          <div className="flex flex-col items-center text-sm text-gray-500 gap-3">
+          <div className="space-y-6">
             {isUpdating ? (
-              <>
+              <div className="flex flex-col items-center text-sm text-gray-500 gap-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                 <span>Calculating composition…</span>
-              </>
+              </div>
             ) : (
-              <span>Add ingredients to preview umami and TCM analytics.</span>
+              <>
+                {/* Template Chart Placeholder */}
+                <div className="space-y-6 opacity-40 pointer-events-none">
+                  {/* EUC/PUI Placeholder */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm text-gray-600">Total Umami (EUC)</div>
+                        <div className="text-2xl font-light text-gray-900">--- <span className="text-sm text-gray-500">mg/100g</span></div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">Perceived Intensity (PUI)</div>
+                        <div className="text-2xl font-light text-fuchsia-700">--<span className="text-sm text-gray-500"> / 100</span></div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 italic">Awaiting composition data</p>
+                  </div>
+                  
+                  {/* Divider */}
+                  <div className="border-t border-gray-200" />
+                  
+                  {/* Umami Profile Placeholder */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Umami Profile</h3>
+                    <LevelBars 
+                      aa={0}
+                      nuc={0}
+                      synergy={0}
+                      size="large"
+                      showValues={true}
+                    />
+                  </div>
+                  
+                  {/* Balance Placeholder */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Balance Analysis</h3>
+                    <BalanceSlider 
+                      aa={50}
+                      nuc={50}
+                    />
+                  </div>
+                </div>
+                
+                {/* Call to Action */}
+                <div className="text-center pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600 mb-2">
+                    <strong className="text-gray-900">Start building your composition</strong>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Charts will appear once you add ingredients above
+                  </p>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -604,16 +657,16 @@ const handleAddWater = () => {
       <div className="space-y-3">
         <div className="overflow-x-auto">
           <div className="flex gap-3 pb-2">
-            {/* Dilute with Water Button - Always visible */}
-            {waterIngredient && (
+            {/* Add Water Button - Only visible when water not in composition */}
+            {waterIngredient && !composition.ingredients.some(item => item.ingredient.id === waterIngredient.id) && (
               <button
                 onClick={handleAddWater}
                 className="paper-texture-light border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 p-4 flex flex-col items-center justify-center gap-3 min-w-[260px] max-w-[260px] flex-shrink-0 transition-all"
               >
                 <Droplet className="w-8 h-8 text-blue-600" />
                 <div className="text-center">
-                  <div className="text-base font-medium text-blue-900">Dilute with water</div>
-                  <div className="text-xs text-blue-700 mt-1">+100g each click</div>
+                  <div className="text-base font-medium text-blue-900">Add water</div>
+                  <div className="text-xs text-blue-700 mt-1">Dilute composition</div>
                 </div>
               </button>
             )}
@@ -700,12 +753,6 @@ const handleAddWater = () => {
                       <span className="font-medium">TCM:</span>{' '}
                       {(item.ingredient.tcm?.five_flavors || ['Sweet']).map(normalizeFlavorLabel).join(', ')} • {(item.ingredient.tcm?.four_qi || ['Neutral']).join(', ')}
                     </div>
-                    {(item.ingredient.flags?.dietary_restrictions?.length ?? 0) > 0 && (
-                      <div>
-                        <span className="font-medium">Dietary:</span>{' '}
-                        {item.ingredient.flags?.dietary_restrictions?.slice(0, 4).join(', ')}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))

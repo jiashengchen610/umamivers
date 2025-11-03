@@ -1,6 +1,8 @@
 'use client'
 
 import { Navigation } from '@/components/Navigation'
+import { LevelBars } from '@/components/LevelBars'
+import { BalanceSlider } from '@/components/BalanceSlider'
 
 export default function HowToUsePage() {
   return (
@@ -57,7 +59,141 @@ export default function HowToUsePage() {
               The fifth basic taste—savory, satisfying, and deeply flavorful. Triggered by glutamate (amino acids) and enhanced by nucleotides (IMP, GMP, AMP).
             </p>
             <p className="text-xs sm:text-sm text-gray-600">
-              When combined, these create <strong>synergy</strong>—up to 8x umami enhancement. That&apos;s why mushrooms + tomatoes = magic.
+              When combined, these create <strong>synergy</strong>—up to 1218× umami enhancement. That&apos;s why mushrooms + tomatoes = magic.
+            </p>
+          </div>
+          
+          <div id="level-system" className="bg-white border border-gray-200 p-4 sm:p-6 rounded-lg mb-4">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3">6-Level Classification System</h3>
+            <p className="text-sm text-gray-700 mb-6">
+              We use a 0–6 level system to classify umami intensity based on scientific ranges.
+            </p>
+            
+            {/* Sample Visual Chart */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Example: Tomato (Level 3)</h4>
+              <LevelBars 
+                aa={60}
+                nuc={25}
+                synergy={650}
+                size="large"
+                showValues={true}
+              />
+            </div>
+            
+            {/* Mobile-optimized tables */}
+            <div className="space-y-6">
+              {/* AA */}
+              <div>
+                <div className="bg-green-50 border-l-4 border-green-600 p-3 rounded mb-3">
+                  <h4 className="font-bold text-gray-900 text-sm">Amino Acids (AA)</h4>
+                  <p className="text-xs text-gray-600 mt-1">Green gradient • mg/100g</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Level</th>
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Range</th>
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Intensity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs sm:text-sm">
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 text-gray-500">0</td><td className="py-2 px-2">0</td><td className="py-2 px-2 text-gray-600">No umami</td></tr>
+                      <tr className="border-b border-gray-100 bg-gray-50"><td className="py-2 px-2 text-gray-500">1</td><td className="py-2 px-2">≤ 10</td><td className="py-2 px-2 text-gray-600">Very Low</td></tr>
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 font-medium">2</td><td className="py-2 px-2">10–30</td><td className="py-2 px-2 text-gray-600">Low</td></tr>
+                      <tr className="border-b border-gray-100 bg-green-50"><td className="py-2 px-2 font-medium">3</td><td className="py-2 px-2 font-medium">30–80</td><td className="py-2 px-2 font-medium text-green-700">Moderate</td></tr>
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 font-medium">4</td><td className="py-2 px-2">80–150</td><td className="py-2 px-2 text-gray-600">High</td></tr>
+                      <tr className="border-b border-gray-100 bg-gray-50"><td className="py-2 px-2 font-medium">5</td><td className="py-2 px-2">150–300</td><td className="py-2 px-2 text-gray-600">Very High</td></tr>
+                      <tr><td className="py-2 px-2 font-medium">6</td><td className="py-2 px-2">&gt; 300</td><td className="py-2 px-2 text-gray-600">Exceptional</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              {/* Nuc */}
+              <div>
+                <div className="bg-amber-50 border-l-4 border-amber-700 p-3 rounded mb-3">
+                  <h4 className="font-bold text-gray-900 text-sm">Nucleotides (Nuc)</h4>
+                  <p className="text-xs text-gray-600 mt-1">Beige to brown gradient • mg/100g</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Level</th>
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Range</th>
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Intensity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs sm:text-sm">
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 text-gray-500">0</td><td className="py-2 px-2">0</td><td className="py-2 px-2 text-gray-600">No umami</td></tr>
+                      <tr className="border-b border-gray-100 bg-gray-50"><td className="py-2 px-2 text-gray-500">1</td><td className="py-2 px-2">≤ 5</td><td className="py-2 px-2 text-gray-600">Very Low</td></tr>
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 font-medium">2</td><td className="py-2 px-2">5–15</td><td className="py-2 px-2 text-gray-600">Low</td></tr>
+                      <tr className="border-b border-gray-100 bg-amber-50"><td className="py-2 px-2 font-medium">3</td><td className="py-2 px-2 font-medium">15–40</td><td className="py-2 px-2 font-medium text-amber-800">Moderate</td></tr>
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 font-medium">4</td><td className="py-2 px-2">40–80</td><td className="py-2 px-2 text-gray-600">High</td></tr>
+                      <tr className="border-b border-gray-100 bg-gray-50"><td className="py-2 px-2 font-medium">5</td><td className="py-2 px-2">80–150</td><td className="py-2 px-2 text-gray-600">Very High</td></tr>
+                      <tr><td className="py-2 px-2 font-medium">6</td><td className="py-2 px-2">&gt; 150</td><td className="py-2 px-2 text-gray-600">Exceptional</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              {/* Synergy */}
+              <div>
+                <div className="bg-purple-50 border-l-4 border-purple-600 p-3 rounded mb-3">
+                  <h4 className="font-bold text-gray-900 text-sm">Synergy (Total EUC)</h4>
+                  <p className="text-xs text-gray-600 mt-1">Lavender to purple gradient • mg/100g</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Level</th>
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Range</th>
+                        <th className="text-left py-2 px-2 font-semibold text-gray-700">Intensity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs sm:text-sm">
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 text-gray-500">0</td><td className="py-2 px-2">0</td><td className="py-2 px-2 text-gray-600">No umami</td></tr>
+                      <tr className="border-b border-gray-100 bg-gray-50"><td className="py-2 px-2 text-gray-500">1</td><td className="py-2 px-2">≤ 100</td><td className="py-2 px-2 text-gray-600">Very Low</td></tr>
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 font-medium">2</td><td className="py-2 px-2">100–400</td><td className="py-2 px-2 text-gray-600">Low</td></tr>
+                      <tr className="border-b border-gray-100 bg-purple-50"><td className="py-2 px-2 font-medium">3</td><td className="py-2 px-2 font-medium">400–1000</td><td className="py-2 px-2 font-medium text-purple-700">Moderate</td></tr>
+                      <tr className="border-b border-gray-100"><td className="py-2 px-2 font-medium">4</td><td className="py-2 px-2">1000–3000</td><td className="py-2 px-2 text-gray-600">High</td></tr>
+                      <tr className="border-b border-gray-100 bg-gray-50"><td className="py-2 px-2 font-medium">5</td><td className="py-2 px-2">3000–8000</td><td className="py-2 px-2 text-gray-600">Very High</td></tr>
+                      <tr><td className="py-2 px-2 font-medium">6</td><td className="py-2 px-2">&gt; 8000</td><td className="py-2 px-2 text-gray-600">Exceptional</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="balance-calculation" className="bg-white border border-gray-200 p-4 sm:p-6 rounded-lg mb-4">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3">Balance Calculation</h3>
+            <p className="text-sm text-gray-700 mb-4">
+              The AA:Nuc balance shows the ratio between amino acids and nucleotides in your composition.
+            </p>
+            
+            {/* Sample Balance Chart */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Example: 70% AA : 30% Nuc</h4>
+              <BalanceSlider 
+                aa={70}
+                nuc={30}
+              />
+            </div>
+            
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-4">
+              <h4 className="text-sm font-bold text-gray-900 mb-2">Formula</h4>
+              <code className="text-xs sm:text-sm font-mono text-gray-800 block">
+                AA% = (AA_total / (AA_total + Nuc_total)) × 100<br />
+                Nuc% = 100 - AA%
+              </code>
+            </div>
+            
+            <p className="text-sm text-gray-700">
+              <strong className="text-gray-900">Peak synergy occurs at a 50:50 balance</strong>, maximizing the 1218× multiplier effect. The gradient visualization darkens toward the center (50%) to show the optimal balance point.
             </p>
           </div>
 
