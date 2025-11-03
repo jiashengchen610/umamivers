@@ -169,26 +169,77 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
     def _apply_umami_filters(self, queryset, umami_filters):
-        """Apply umami-related filters (OR within group)"""
+        """Apply umami-related filters based on chart levels (level 4+)
+        Level 4 thresholds:
+        - AA: 80 mg/100g
+        - Nuc: 40 mg/100g  
+        - Synergy: 1000 mg/100g
+        """
         umami_query = Q()
         for filter_type in umami_filters:
             if filter_type == 'umami_aa':
-                umami_query |= Q(chemistry__umami_aa__gt=0)
+                # Level 4+ for AA: >= 80 mg/100g
+                umami_query |= Q(chemistry__umami_aa__gte=80)
             elif filter_type == 'umami_nuc':
-                umami_query |= Q(chemistry__umami_nuc__gt=0)
+                # Level 4+ for Nuc: >= 40 mg/100g
+                umami_query |= Q(chemistry__umami_nuc__gte=40)
             elif filter_type == 'umami_synergy':
-                umami_query |= Q(chemistry__umami_synergy__gt=0)
+                # Level 4+ for Synergy: >= 1000 mg/100g
+                umami_query |= Q(chemistry__umami_synergy__gte=1000)
         
         return queryset.filter(umami_query)
 
     def _apply_flavor_filters(self, queryset, flavor_filters):
-        """Apply flavor role filters"""
+        """Apply flavor role filters based on ingredient type and umami levels
+        - High Umami: AA >= 80 OR Nuc >= 40 OR Synergy >= 1000 (level 4+)
+        - Flavor Carrier: Staple foods (rice, bread, noodles, pasta, flour, wheat, grain)
+        - Flavor Supporting: Everything else
+        """
         flavor_query = Q()
+        
         for filter_type in flavor_filters:
-            if filter_type == 'flavor_supporting':
-                flavor_query |= Q(flags__flavor_tags__contains=[filter_type])
+            if filter_type == 'high_umami':
+                # Level 4+ on any metric
+                flavor_query |= (
+                    Q(chemistry__umami_aa__gte=80) |
+                    Q(chemistry__umami_nuc__gte=40) |
+                    Q(chemistry__umami_synergy__gte=1000)
+                )
             elif filter_type == 'flavor_carrier':
-                flavor_query |= Q(flags__flavor_tags__contains=[filter_type])
+                # Staple foods - search in name and category
+                staples_query = Q()
+                staple_terms = ['rice', 'bread', 'noodle', 'pasta', 'flour', 'wheat', 'grain']
+                for term in staple_terms:
+                    staples_query |= (
+                        Q(base_name__icontains=term) |
+                        Q(display_name__icontains=term) |
+                        Q(category__icontains=term)
+                    )
+                # Exclude high umami items
+                staples_query &= ~(
+                    Q(chemistry__umami_aa__gte=80) |
+                    Q(chemistry__umami_nuc__gte=40) |
+                    Q(chemistry__umami_synergy__gte=1000)
+                )
+                flavor_query |= staples_query
+                
+            elif filter_type == 'flavor_supporting':
+                # Everything that's not high umami and not a carrier
+                high_umami = (
+                    Q(chemistry__umami_aa__gte=80) |
+                    Q(chemistry__umami_nuc__gte=40) |
+                    Q(chemistry__umami_synergy__gte=1000)
+                )
+                staples = Q()
+                staple_terms = ['rice', 'bread', 'noodle', 'pasta', 'flour', 'wheat', 'grain']
+                for term in staple_terms:
+                    staples |= (
+                        Q(base_name__icontains=term) |
+                        Q(display_name__icontains=term) |
+                        Q(category__icontains=term)
+                    )
+                # Not high umami AND not carrier
+                flavor_query |= (~high_umami & ~staples)
         
         return queryset.filter(flavor_query)
 
@@ -298,7 +349,27 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.filter(category__in=category_filters)
 
     def _apply_sorting(self, queryset, sort_by):
-        """Apply sorting based on sort parameter"""
+        """Apply sorting based on sort parameter and umami filters
+        If multiple umami filters active, always sort by synergy descending
+        """
+        # Check if multiple umami filters are active
+        umami_filters = self.request.query_params.getlist('umami[]')
+        
+        # If multiple umami filters, always sort by synergy
+        if len(umami_filters) > 1:
+            return queryset.order_by('-chemistry__umami_synergy', '-chemistry__umami_aa')
+        
+        # Single umami filter - sort by that metric
+        if len(umami_filters) == 1:
+            filter_type = umami_filters[0]
+            if filter_type == 'umami_aa':
+                return queryset.order_by('-chemistry__umami_aa', '-chemistry__umami_synergy')
+            elif filter_type == 'umami_nuc':
+                return queryset.order_by('-chemistry__umami_nuc', '-chemistry__umami_synergy')
+            elif filter_type == 'umami_synergy':
+                return queryset.order_by('-chemistry__umami_synergy', '-chemistry__umami_aa')
+        
+        # Default sorting behavior
         if sort_by == 'relevance':
             # For relevance sorting, maintain the order from fuzzy search if there's a query
             query = self.request.query_params.get('q', '')
