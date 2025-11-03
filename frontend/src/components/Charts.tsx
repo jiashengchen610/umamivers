@@ -4,6 +4,9 @@ import { Chemistry, TCM } from '@/types'
 import { Plus } from 'lucide-react'
 import { gToMg, formatUmamiMg, getUmamiColor, getUmamiLevel } from '@/lib/umamiLevels'
 
+// Re-export new 6-level system
+export { LevelBars } from './LevelBars'
+
 interface CategoricalBarProps {
   title: string
   data: Array<{ name: string, value: number, color: string }>
