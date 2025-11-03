@@ -26,6 +26,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         fixture_path = options['file']
         clear_first = options['clear']
+        should_cleanup = False
         
         # Handle .gz files
         if fixture_path.endswith('.gz'):
@@ -34,13 +35,15 @@ class Command(BaseCommand):
                 return
             
             self.stdout.write(f'Decompressing {fixture_path}...')
-            uncompressed_path = fixture_path[:-3]  # Remove .gz extension
+            # Use a temporary filename to avoid conflicts
+            uncompressed_path = fixture_path[:-3] + '.tmp.json'
             
             with gzip.open(fixture_path, 'rb') as f_in:
                 with open(uncompressed_path, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
             
             fixture_path = uncompressed_path
+            should_cleanup = True
             self.stdout.write(self.style.SUCCESS(f'Decompressed to {fixture_path}'))
         
         if not os.path.exists(fixture_path):
@@ -61,3 +64,8 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Load failed: {e}'))
             raise
+        finally:
+            # Clean up temporary decompressed file
+            if should_cleanup and os.path.exists(fixture_path):
+                os.remove(fixture_path)
+                self.stdout.write('Cleaned up temporary file')
