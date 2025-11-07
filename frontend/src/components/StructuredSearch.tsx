@@ -512,7 +512,7 @@ const handleAddWater = () => {
             // Trigger search with forceShow to display all ingredients
             handleSearch(filters, 1, true, true)
           }}
-          placeholder="Search ingredients by name, umami properties, or TCM attributes..."
+          placeholder="Search and add ingredients"
           className="block w-full pl-12 pr-12 py-3 h-11 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-lg transition-all"
         />
         {(hasActiveQuery || hasActiveFilters) && (
