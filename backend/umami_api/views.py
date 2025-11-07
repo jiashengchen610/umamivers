@@ -60,6 +60,10 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         
         # Get filter parameters
         query = self.request.query_params.get('q', '')
+        
+        # Validate query length to prevent abuse
+        if len(query) > 200:
+            query = query[:200]
         sort_by = self.request.query_params.get('sort', 'synergy')
         
         # Umami filters
