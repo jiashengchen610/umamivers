@@ -7,11 +7,12 @@ cd backend
 pip install --upgrade pip
 pip install -r requirements.txt
 
-echo "==> Running migrations..."
-python manage.py migrate --noinput
+if [ "$USE_SQLITE" != "true" ]; then
+    echo "==> Running migrations..."
+    python manage.py migrate --noinput
 
-echo "==> Creating PostgreSQL extensions..."
-python manage.py shell -c "
+    echo "==> Creating PostgreSQL extensions..."
+    python manage.py shell -c "
 from django.db import connection
 try:
     with connection.cursor() as cursor:
@@ -20,14 +21,21 @@ try:
     print('Extensions created successfully')
 except Exception as e:
     print(f'Extension warning (may already exist): {e}')
-" || echo "Extensions may already exist, continuing..."
+    " || echo "Extensions may already exist, continuing..."
 
-echo "==> Loading fixtures..."
-# Load the corrected weighted-value fixture data
-python manage.py load_fixture_data --file ../fixture_data.json.gz --clear
+    echo "==> Loading fixtures..."
+    # Load the corrected weighted-value fixture data
+    python manage.py load_fixture_data --file ../fixture_data.json.gz --clear
 
-echo "==> Initializing water ingredient..."
-python manage.py init_water || echo "Water ingredient initialization skipped"
+    echo "==> Initializing water ingredient..."
+    python manage.py init_water || echo "Water ingredient initialization skipped"
+else
+    echo "==> Using SQLite, skipping migrations and fixture loading (db.sqlite3 should be present)..."
+    # Still run migrate to ensure any new migrations are applied if needed, but it might be risky if db is read-only
+    # For now, let's assume db.sqlite3 is up to date.
+    # Actually, we should probably run migrate just in case, but definitely skip PG extensions.
+    python manage.py migrate --noinput
+fi
 
 echo "==> Collecting static files..."
 python manage.py collectstatic --noinput
