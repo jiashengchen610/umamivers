@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.postgres.fields import ArrayField
+
 import json
 
 
@@ -53,9 +53,9 @@ class Chemistry(models.Model):
 
 class TCM(models.Model):
     ingredient = models.OneToOneField(Ingredient, on_delete=models.CASCADE, primary_key=True)
-    four_qi = ArrayField(models.CharField(max_length=50), default=list, blank=True)
-    five_flavors = ArrayField(models.CharField(max_length=50), default=list, blank=True)  # TCM Five Tastes
-    meridians = ArrayField(models.CharField(max_length=50), default=list, blank=True)
+    four_qi = models.JSONField(default=list, blank=True)
+    five_flavors = models.JSONField(default=list, blank=True)  # TCM Five Tastes
+    meridians = models.JSONField(default=list, blank=True)
     overview = models.TextField(null=True, blank=True)
     confidence = models.DecimalField(max_digits=3, decimal_places=2, default=1.0)
 
