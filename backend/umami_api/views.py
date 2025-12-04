@@ -1,6 +1,6 @@
 from django.db import connection
 from django.db.models import Q, F
-from django.contrib.postgres.search import TrigramSimilarity
+# from django.contrib.postgres.search import TrigramSimilarity
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -147,30 +147,13 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.distinct()
 
     def _apply_fuzzy_search(self, queryset, query):
-        """Apply trigram similarity across names and aliases with weighted score"""
-        # Compute trigram similarity for base/display names
-        qs = queryset.annotate(
-            sim_base=TrigramSimilarity('base_name', query),
-            sim_display=TrigramSimilarity('display_name', query),
-        )
-        # Best name similarity
-        qs = qs.annotate(sim_name=F('sim_base') + F('sim_display'))
-
-        # Approximate alias similarity using EXISTS filter; we can't aggregate easily without GROUP BY, so
-        # we boost items that have any alias containing the query, and otherwise rely on name similarity.
-        alias_match = Q(aliases__name__icontains=query)
-        qs = qs.annotate(
-            sim_alias=F('sim_name')  # placeholder to keep types
-        )
-        # Filter low-similarity quickly
-        qs = qs.filter(Q(sim_name__gt=0.05) | alias_match | Q(base_name__icontains=query) | Q(display_name__icontains=query))
-
-        # Weighted score: names weighted higher than alias presence
-        qs = qs.annotate(
-            score=F('sim_name') * 0.9 + F('sim_base') * 0.1
-        ).order_by('-score')
-
-        return qs
+        """Apply fuzzy search - simple icontains for SQLite fallback"""
+        # Simple fallback for SQLite: search in base_name, display_name, and aliases
+        return queryset.filter(
+            Q(base_name__icontains=query) |
+            Q(display_name__icontains=query) |
+            Q(aliases__name__icontains=query)
+        ).distinct()
 
     def _apply_umami_filters(self, queryset, umami_filters):
         """Apply umami-related filters based on chart levels (level 4+ = High)
