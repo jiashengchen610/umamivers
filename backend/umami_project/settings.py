@@ -158,15 +158,10 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
 
 # Cache settings (using Redis)
+# Cache settings (using Local Memory for simplicity and to avoid Redis dependency)
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-        'OPTIONS': {
-            'CONNECTION_POOL_KWARGS': {
-                'max_connections': 50,
-            },
-        },
-        'TIMEOUT': 300,
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
     }
 }
